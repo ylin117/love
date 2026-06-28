@@ -1170,13 +1170,14 @@ function handleLetHimDecide() {
  * 发送“让他决定”到主聊天（梦角）
  */
 function sendLetHimDecide(question, result) {
-    const mode = window._gcMode !== undefined ? window._gcMode : 0;
+    // 判断当前是否在群聊模式（基于你的 groupChatSettings）
+    const isGroupChat = window.groupChatSettings && window.groupChatSettings.enabled === true;
 
     // =============================================
     // 群聊模式
     // =============================================
-    if (mode === 1) {
-        const members = window.cachedGcMembers || [];
+    if (isGroupChat) {
+        const members = window.groupChatSettings.members || [];
         if (members.length === 0) {
             if (typeof showNotification === 'function') {
                 showNotification('群聊中没有成员，无法让他决定', 'warning');
@@ -1214,7 +1215,7 @@ function sendLetHimDecide(question, result) {
 
         // 3. 每位选中的成员独立随机抽签并延迟回复
         selectedMembers.forEach((member, index) => {
-            // 每位成员独立从选项列表中随机抽取（即使结果相同也无妨，但这里是独立随机）
+            // 每位成员独立从选项列表中随机抽取
             const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
 
             // 基础延迟 10~60 秒，每位成员额外错开 0~5 秒
