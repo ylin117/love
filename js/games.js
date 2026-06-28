@@ -1169,6 +1169,33 @@ function handleLetHimDecide() {
 /**
  * 发送“让他决定”到主聊天（梦角）
  */
+// ===== 辅助函数：手动渲染群聊消息 =====
+function renderGcMessage(msg) {
+    const box = document.getElementById('gcBox');
+    if (!box) {
+        console.warn('[renderGcMessage] gcBox 不存在');
+        return;
+    }
+    const isMine = msg.sender === 'me';
+    const name = isMine ? (settings.myName || '我') : (msg.memberName || '群成员');
+    let content = msg.text || '';
+    if (msg.type === 'image') content = `<img src="${msg.content}" class="msg-image" loading="lazy">`;
+    // 简单处理：只支持文本和图片
+    const avatarStyle = !isMine ? 'background-image:url()' : '';
+    const html = `
+        <div class="message ${isMine ? 'mine' : 'other'}" id="gcmsg-dom-${msg.id}" data-id="${msg.id}">
+            <div class="gc-msg-avatar ${isMine ? 'gc-avatar-me' : ''}" style="${avatarStyle}"></div>
+            <div class="bubble-wrap">
+                ${!isMine ? `<div class="gc-msg-name">${name}</div>` : ''}
+                <div class="bubble">${content}</div>
+                <div class="msg-meta"><span class="time">${formatTime(msg.timestamp)}</span></div>
+            </div>
+        </div>`;
+    box.insertAdjacentHTML('beforeend', html);
+    box.scrollTop = box.scrollHeight;
+}
+
+// ===== 主函数 =====
 function sendLetHimDecide(question, result) {
     console.log('[让他决定] 函数被调用，当前模式:', window._gcMode);
 
@@ -1180,7 +1207,6 @@ function sendLetHimDecide(question, result) {
     // 群聊模式
     // =============================================
     if (isGroupMode) {
-        // ✅ 从 groupChatSettings.members 获取群成员
         const members = window.groupChatSettings?.members || [];
         console.log('[让他决定] 群成员列表:', members);
 
@@ -1191,7 +1217,6 @@ function sendLetHimDecide(question, result) {
             return;
         }
 
-        // 决定回复人数（1~3 人，不超过总人数）
         const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
         console.log(`[让他决定] 群聊共有 ${members.length} 位成员，将随机选择 ${replyCount} 位回复`);
 
@@ -1201,6 +1226,7 @@ function sendLetHimDecide(question, result) {
 
         // ===== 用户消息 =====
         const userMsg = {
+            id: Date.now() + Math.random(),
             sender: 'me',
             type: 'normal',
             text: `让他决定：${question}`,
@@ -1211,26 +1237,18 @@ function sendLetHimDecide(question, result) {
             replyTo: null
         };
 
-        // 存储用户消息
         console.log('[让他决定] 正在存储用户消息...');
         _storeMessage('gcMessages', userMsg).then(() => {
             console.log('[让他决定] 用户消息存储成功，尝试渲染');
-            if (typeof appendGcMessageToUI === 'function') {
-                appendGcMessageToUI(userMsg);
-                console.log('[让他决定] appendGcMessageToUI 执行完成');
-                if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
-            } else {
-                console.error('[让他决定] appendGcMessageToUI 未定义！');
-            }
+            renderGcMessage(userMsg);
+            if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
         }).catch(err => {
             console.error('[让他决定] 存储用户消息失败:', err);
         });
 
         // ===== 每位成员的回复 =====
         selectedMembers.forEach((member, index) => {
-            // 每位成员独立随机抽取
             const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
-            // 基础延迟 10~60 秒（根据你设置）
             const baseDelay = 10000 + Math.random() * 50000;
             const offset = index * 2000 + Math.random() * 3000;
             const delay = baseDelay + offset;
@@ -1239,6 +1257,7 @@ function sendLetHimDecide(question, result) {
 
             setTimeout(() => {
                 const replyMsg = {
+                    id: Date.now() + Math.random(),
                     sender: 'gc_' + member.id,
                     memberName: member.name,
                     type: 'normal',
@@ -1253,13 +1272,8 @@ function sendLetHimDecide(question, result) {
                 console.log('[让他决定] 正在存储回复消息:', replyMsg);
                 _storeMessage('gcMessages', replyMsg).then(() => {
                     console.log('[让他决定] 回复消息存储成功，尝试渲染');
-                    if (typeof appendGcMessageToUI === 'function') {
-                        appendGcMessageToUI(replyMsg);
-                        console.log('[让他决定] appendGcMessageToUI 执行完成');
-                        if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
-                    } else {
-                        console.error('[让他决定] appendGcMessageToUI 未定义！');
-                    }
+                    renderGcMessage(replyMsg);
+                    if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
@@ -1291,6 +1305,7 @@ function sendLetHimDecide(question, result) {
 
     // 用户消息（立即发送）
     const userMsg = {
+        id: Date.now() + Math.random(),
         sender: 'user',
         type: 'normal',
         text: `让他决定：${question}`,
@@ -1313,6 +1328,7 @@ function sendLetHimDecide(question, result) {
     const delay = 10000 + Math.random() * 50000;
     setTimeout(() => {
         const replyMsg = {
+            id: Date.now() + Math.random(),
             sender: partnerName,
             type: 'normal',
             text: `关于“${question}”，我的决定是：${result}`,
