@@ -1028,6 +1028,15 @@ function initDecisionModule() {
         });
         sendResultBtn.dataset.initialized = 'true';
     }
+
+    // ===== 新增：让他决定按钮 =====
+    const letHimDecideBtn = document.getElementById('let-him-decide-btn');
+    if (letHimDecideBtn && !letHimDecideBtn.dataset.initialized) {
+         letHimDecideBtn.dataset.initialized = 'true';
+         letHimDecideBtn.addEventListener('click', function() {
+          handleLetHimDecide();
+        });
+       }
 }
 
 function initPicker() {
@@ -1096,6 +1105,121 @@ function renderPickerCards(selectedIndex = -1) {
     });
 }
 
+// ===== 全局标志 =====
+let _pendingLetHimDecide = false;
+let _pendingQuestion = '';
+
+/**
+ * 处理“让他决定”按钮点击
+ */
+function handleLetHimDecide() {
+    const input = document.getElementById('wheel-decision-input');
+    const question = (input ? input.value.trim() : '');
+    if (!question) {
+        showNotification('请先输入你想让对方决定的事情', 'warning');
+        return;
+    }
+
+    // 如果还没有抽签结果，则先触发抽签，并标记待发送
+    if (!wheelResultText) {
+        _pendingLetHimDecide = true;
+        _pendingQuestion = question;
+        doPick(); // 抽签动画结束后会自动检测 _pendingLetHimDecide
+    } else {
+        // 已有结果，直接发送
+        sendLetHimDecide(question, wheelResultText);
+    }
+}
+
+/**
+ * 发送“让他决定”到当前聊天
+ */
+function sendLetHimDecide(question, result) {
+    // 判断当前聊天模式
+    const mode = window._gcMode !== undefined ? window._gcMode : 0; // 0=单聊, 1=群聊, 2=密聊
+    const pmMember = window._pmMember || null;
+
+    if (mode === 0) {
+        // 主角色单聊：发送给 Sean
+        // 1) 用户消息
+        const userMsg = {
+            sender: 'me',
+            type: 'text',
+            text: `让他决定：${question}`,
+            timestamp: Date.now(),
+            quote: null
+        };
+        add('messages', userMsg).then(() => {
+            if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
+                appendMessageToUI(userMsg, '已送达');
+            }
+        });
+
+        // 2) Sean 的回复
+        const seanMsg = {
+            sender: 'sean',
+            type: 'text',
+            text: `关于“${question}”，我的决定是：${result}`,
+            timestamp: Date.now(),
+            quote: null
+        };
+        add('messages', seanMsg).then(() => {
+            if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
+                appendMessageToUI(seanMsg, '');
+            }
+            playNotifySound(seanName, '做出了决定');
+            showNotification('对方已回复你的决定 ✨', 'success', 2000);
+        });
+
+    } else if (mode === 2 && pmMember) {
+        // 密聊模式：发送给当前密聊对象
+        const targetId = pmMember.id;
+        // 用户消息
+        const userMsg = {
+            sender: 'me',
+            type: 'text',
+            text: `让他决定：${question}`,
+            pm: targetId,
+            timestamp: Date.now()
+        };
+        add('gcMessages', userMsg);
+
+        // 对方回复
+        const replyMsg = {
+            sender: 'gc_' + targetId,
+            memberName: pmMember.name,
+            type: 'text',
+            text: `关于“${question}”，我的决定是：${result}`,
+            pm: targetId,
+            timestamp: Date.now()
+        };
+        add('gcMessages', replyMsg).then(() => {
+            if (_gcMode === 2 && _pmMember && _pmMember.id === targetId &&
+                document.getElementById('view-chat').classList.contains('active')) {
+                appendGcMessageToUI(replyMsg);
+                scrollGcToBottom();
+            }
+            playNotifySound(pmMember.name, '做出了决定');
+            showNotification(`${pmMember.name} 已回复你的决定 ✨`, 'success', 2000);
+        });
+
+    } else {
+        // 群聊或其他模式：暂不支持，或可提示
+        showNotification('该功能目前仅支持单聊和密聊', 'warning');
+    }
+
+    // 清空输入框和结果（可选）
+    const input = document.getElementById('wheel-decision-input');
+    if (input) input.value = '';
+    wheelResultText = '';
+    const resultEl = document.getElementById('wheel-result');
+    if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
+    const sendBtn = document.getElementById('send-wheel-result');
+    if (sendBtn) sendBtn.style.display = 'none';
+    const spinBtn = document.getElementById('spin-wheel-btn');
+    if (spinBtn) spinBtn.disabled = false;
+}
+
 function doPick() {
     if (wheelOptions.length < 2) {
         showNotification("请至少添加两个选项", "warning");
@@ -1154,6 +1278,13 @@ function doPick() {
                 spinBtn.disabled = false;
                 sendBtn.style.display = 'inline-block';
                 playSound('favorite');
+                // ===== 新增：检测待发送 =====
+                if (_pendingLetHimDecide && wheelResultText) {
+                    const q = _pendingQuestion;
+                    _pendingLetHimDecide = false;
+                    _pendingQuestion = '';
+                    sendLetHimDecide(q, wheelResultText);
+                }
             }, 300);
         }
     }
