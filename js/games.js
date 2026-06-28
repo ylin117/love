@@ -1149,7 +1149,7 @@ function sendLetHimDecide(question, result) {
             timestamp: Date.now(),
             quote: null
         };
-        add('messages', userMsg).then(() => {
+        window.add('messages', userMsg).then(() => {
             if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
                 appendMessageToUI(userMsg, '已送达');
             }
@@ -1163,7 +1163,7 @@ function sendLetHimDecide(question, result) {
             timestamp: Date.now(),
             quote: null
         };
-        add('messages', seanMsg).then(() => {
+        window.add('messages', seanMsg).then(() => {
             if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
                 appendMessageToUI(seanMsg, '');
             }
@@ -1182,7 +1182,7 @@ function sendLetHimDecide(question, result) {
             pm: targetId,
             timestamp: Date.now()
         };
-        add('gcMessages', userMsg);
+        window.add('gcMessages', userMsg);
 
         // 对方回复
         const replyMsg = {
@@ -1193,7 +1193,7 @@ function sendLetHimDecide(question, result) {
             pm: targetId,
             timestamp: Date.now()
         };
-        add('gcMessages', replyMsg).then(() => {
+        window.add('gcMessages', replyMsg).then(() => {
             if (_gcMode === 2 && _pmMember && _pmMember.id === targetId &&
                 document.getElementById('view-chat').classList.contains('active')) {
                 appendGcMessageToUI(replyMsg);
