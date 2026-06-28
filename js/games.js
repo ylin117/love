@@ -1245,7 +1245,7 @@ function doPick() {
         });
         
         flashCount++;
-        const delay = flashCount < 8 ? 80 : flashCount < 14 ? 130 : 250;
+        const delay = 15000 + Math.random() * 45000; // 15~60秒
         if (flashCount < totalFlashes) {
             setTimeout(flash, delay);
         } else {
