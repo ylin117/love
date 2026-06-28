@@ -1,3 +1,22 @@
+// ===== 自包含存储函数（不依赖 _storeMessage） =====
+function _storeMessage(storeName, data) {
+    return new Promise((resolve) => {
+        // 构建存储 key（与 data.js 保持一致）
+        const prefix = window.APP_PREFIX || 'CHAT_APP_V3_';
+        const sessionId = window.SESSION_ID || '';
+        const key = prefix + (sessionId ? sessionId + '_' : '') + storeName;
+
+        localforage.getItem(key).then(arr => {
+            arr = arr || [];
+            data.id = Date.now() + Math.random();
+            arr.push(data);
+            localforage.setItem(key, arr).then(() => {
+                resolve(data.id);
+            }).catch(() => resolve(null));
+        }).catch(() => resolve(null));
+    });
+}
+
 function renderStatsContent() {
             const statsContent = DOMElements.statsModal.content;
 
@@ -1149,7 +1168,7 @@ function sendLetHimDecide(question, result) {
             timestamp: Date.now(),
             quote: null
         };
-        window.add('messages', userMsg).then(() => {
+        _storeMessage('messages', userMsg).then(() => {
             if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
                 appendMessageToUI(userMsg, '已送达');
             }
@@ -1163,7 +1182,7 @@ function sendLetHimDecide(question, result) {
             timestamp: Date.now(),
             quote: null
         };
-        window.add('messages', seanMsg).then(() => {
+        _storeMessage('messages', seanMsg).then(() => {
             if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
                 appendMessageToUI(seanMsg, '');
             }
@@ -1182,7 +1201,7 @@ function sendLetHimDecide(question, result) {
             pm: targetId,
             timestamp: Date.now()
         };
-        window.add('gcMessages', userMsg);
+        _storeMessage('gcMessages', userMsg);
 
         // 对方回复
         const replyMsg = {
@@ -1193,7 +1212,7 @@ function sendLetHimDecide(question, result) {
             pm: targetId,
             timestamp: Date.now()
         };
-        window.add('gcMessages', replyMsg).then(() => {
+        _storeMessage('gcMessages', replyMsg).then(() => {
             if (_gcMode === 2 && _pmMember && _pmMember.id === targetId &&
                 document.getElementById('view-chat').classList.contains('active')) {
                 appendGcMessageToUI(replyMsg);
