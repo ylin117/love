@@ -1,7 +1,5 @@
-// ===== 自包含存储函数（不依赖 _storeMessage） =====
 function _storeMessage(storeName, data) {
     return new Promise((resolve) => {
-        // 构建存储 key（与 data.js 保持一致）
         const prefix = window.APP_PREFIX || 'CHAT_APP_V3_';
         const sessionId = window.SESSION_ID || '';
         const key = prefix + (sessionId ? sessionId + '_' : '') + storeName;
@@ -1169,8 +1167,8 @@ function sendLetHimDecide(question, result) {
             quote: null
         };
         _storeMessage('messages', userMsg).then(() => {
-            if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
-                appendMessageToUI(userMsg, '已送达');
+           const chatView = document.getElementById('view-chat');
+            if (chatView && chatView.classList.contains('active') && _gcMode === 0) {appendMessageToUI(userMsg, '已送达');
             }
         });
 
@@ -1183,8 +1181,9 @@ function sendLetHimDecide(question, result) {
             quote: null
         };
         _storeMessage('messages', seanMsg).then(() => {
-            if (document.getElementById('view-chat').classList.contains('active') && _gcMode === 0) {
-                appendMessageToUI(seanMsg, '');
+            const chatView = document.getElementById('view-chat');
+            if (chatView && chatView.classList.contains('active') && _gcMode === 0) {
+            appendMessageToUI(seanMsg, '');
             }
             playNotifySound(seanName, '做出了决定');
             showNotification('对方已回复你的决定 ✨', 'success', 2000);
@@ -1213,10 +1212,11 @@ function sendLetHimDecide(question, result) {
             timestamp: Date.now()
         };
         _storeMessage('gcMessages', replyMsg).then(() => {
+            const chatView = document.getElementById('view-chat');
             if (_gcMode === 2 && _pmMember && _pmMember.id === targetId &&
-                document.getElementById('view-chat').classList.contains('active')) {
-                appendGcMessageToUI(replyMsg);
-                scrollGcToBottom();
+            chatView && chatView.classList.contains('active')) {
+            appendGcMessageToUI(replyMsg);
+            scrollGcToBottom();
             }
             playNotifySound(pmMember.name, '做出了决定');
             showNotification(`${pmMember.name} 已回复你的决定 ✨`, 'success', 2000);
