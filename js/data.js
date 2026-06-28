@@ -596,4 +596,4 @@ document.addEventListener('DOMContentLoaded', function() {
         statusEl.textContent = '关闭状态 — 开启后可在后台接收消息提醒';
     }
 window.add = add;
-});
+})();
