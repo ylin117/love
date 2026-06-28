@@ -1166,36 +1166,62 @@ function handleLetHimDecide() {
     if (spinBtn) spinBtn.disabled = false;
 }
 
-/**
- * 发送“让他决定”到主聊天（梦角）
- */
-// ===== 辅助函数：手动渲染群聊消息 =====
-function renderGcMessage(msg) {
+// =============================================
+// 独立群聊消息渲染（内嵌在函数内，无需额外定义）
+// =============================================
+function _renderGcMessage(msg) {
     const box = document.getElementById('gcBox');
     if (!box) {
         console.warn('[renderGcMessage] gcBox 不存在');
-        return;
+        return false;
     }
+    if (box.style.display === 'none') {
+        box.style.display = '';
+    }
+
     const isMine = msg.sender === 'me';
-    const name = isMine ? (settings.myName || '我') : (msg.memberName || '群成员');
+    const name = isMine
+        ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
+        : (msg.memberName || '群成员');
+
+    let avatarStyle = '';
+    if (!isMine) {
+        const member = (window.groupChatSettings?.members || []).find(m => 'gc_' + m.id === msg.sender);
+        if (member && member.avatar) {
+            avatarStyle = `background-image:url(${member.avatar});background-size:cover;background-position:center;`;
+        } else {
+            avatarStyle = 'background:#e0d4f7;';
+        }
+    }
+
     let content = msg.text || '';
     if (msg.type === 'image') content = `<img src="${msg.content}" class="msg-image" loading="lazy">`;
-    // 简单处理：只支持文本和图片
-    const avatarStyle = !isMine ? 'background-image:url()' : '';
+    else if (msg.type === 'sticker') content = `<img src="${msg.content}" class="msg-sticker" loading="lazy">`;
+    else if (msg.type === 'doodle') content = `<img src="${msg.content}" class="msg-image" loading="lazy">`;
+
+    const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN', {
+        hour: '2-digit', minute: '2-digit'
+    }) : '';
+
     const html = `
-        <div class="message ${isMine ? 'mine' : 'other'}" id="gcmsg-dom-${msg.id}" data-id="${msg.id}">
-            <div class="gc-msg-avatar ${isMine ? 'gc-avatar-me' : ''}" style="${avatarStyle}"></div>
+        <div class="message ${isMine ? 'mine' : 'other'}" data-id="${msg.id}">
+            <div class="gc-msg-avatar ${isMine ? 'gc-avatar-me' : ''}" style="${isMine ? '' : avatarStyle}"></div>
             <div class="bubble-wrap">
-                ${!isMine ? `<div class="gc-msg-name">${name}</div>` : ''}
+                ${isMine ? '' : `<div class="gc-msg-name">${name}</div>`}
                 <div class="bubble">${content}</div>
-                <div class="msg-meta"><span class="time">${formatTime(msg.timestamp)}</span></div>
+                <div class="msg-meta"><span class="time">${timeStr}</span></div>
             </div>
-        </div>`;
+        </div>
+    `;
+
     box.insertAdjacentHTML('beforeend', html);
     box.scrollTop = box.scrollHeight;
+    return true;
 }
 
-// ===== 主函数 =====
+// =============================================
+// 主函数：让他决定
+// =============================================
 function sendLetHimDecide(question, result) {
     console.log('[让他决定] 函数被调用，当前模式:', window._gcMode);
 
@@ -1217,6 +1243,14 @@ function sendLetHimDecide(question, result) {
             return;
         }
 
+        // 确保 gcBox 可见
+        const box = document.getElementById('gcBox');
+        if (box) {
+            box.style.display = '';
+            console.log('[让他决定] gcBox 已显示');
+        }
+
+        // 决定回复人数（1~3 人，不超过总人数）
         const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
         console.log(`[让他决定] 群聊共有 ${members.length} 位成员，将随机选择 ${replyCount} 位回复`);
 
@@ -1226,7 +1260,6 @@ function sendLetHimDecide(question, result) {
 
         // ===== 用户消息 =====
         const userMsg = {
-            id: Date.now() + Math.random(),
             sender: 'me',
             type: 'normal',
             text: `让他决定：${question}`,
@@ -1240,8 +1273,7 @@ function sendLetHimDecide(question, result) {
         console.log('[让他决定] 正在存储用户消息...');
         _storeMessage('gcMessages', userMsg).then(() => {
             console.log('[让他决定] 用户消息存储成功，尝试渲染');
-            renderGcMessage(userMsg);
-            if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+            _renderGcMessage(userMsg);
         }).catch(err => {
             console.error('[让他决定] 存储用户消息失败:', err);
         });
@@ -1249,7 +1281,7 @@ function sendLetHimDecide(question, result) {
         // ===== 每位成员的回复 =====
         selectedMembers.forEach((member, index) => {
             const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
-            const baseDelay = 10000 + Math.random() * 50000;
+            const baseDelay = 10000 + Math.random() * 50000; // 10~60 秒
             const offset = index * 2000 + Math.random() * 3000;
             const delay = baseDelay + offset;
 
@@ -1257,7 +1289,6 @@ function sendLetHimDecide(question, result) {
 
             setTimeout(() => {
                 const replyMsg = {
-                    id: Date.now() + Math.random(),
                     sender: 'gc_' + member.id,
                     memberName: member.name,
                     type: 'normal',
@@ -1272,8 +1303,7 @@ function sendLetHimDecide(question, result) {
                 console.log('[让他决定] 正在存储回复消息:', replyMsg);
                 _storeMessage('gcMessages', replyMsg).then(() => {
                     console.log('[让他决定] 回复消息存储成功，尝试渲染');
-                    renderGcMessage(replyMsg);
-                    if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+                    _renderGcMessage(replyMsg);
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
@@ -1299,13 +1329,12 @@ function sendLetHimDecide(question, result) {
     }
 
     // =============================================
-    // 单聊模式（保持不变）
+    // 单聊模式（保持原有逻辑不变）
     // =============================================
     const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
 
     // 用户消息（立即发送）
     const userMsg = {
-        id: Date.now() + Math.random(),
         sender: 'user',
         type: 'normal',
         text: `让他决定：${question}`,
@@ -1328,7 +1357,6 @@ function sendLetHimDecide(question, result) {
     const delay = 10000 + Math.random() * 50000;
     setTimeout(() => {
         const replyMsg = {
-            id: Date.now() + Math.random(),
             sender: partnerName,
             type: 'normal',
             text: `关于“${question}”，我的决定是：${result}`,
