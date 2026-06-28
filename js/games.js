@@ -1126,9 +1126,9 @@ function renderPickerCards(selectedIndex = -1) {
 let _pendingLetHimDecide = false;
 let _pendingQuestion = '';
 
-/**
- * 处理“让他决定”按钮点击
- */
+// =============================================
+// 1. 点击“让他决定”按钮的入口
+// =============================================
 function handleLetHimDecide() {
     const input = document.getElementById('wheel-decision-input');
     const question = (input ? input.value.trim() : '');
@@ -1137,17 +1137,16 @@ function handleLetHimDecide() {
         return;
     }
 
-    // 直接从选项列表中随机选一个结果（不带动画，独立选取）
+    // 验证选项列表非空
     if (!wheelOptions || wheelOptions.length === 0) {
         showNotification('请先添加选项', 'warning');
         return;
     }
-    const result = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
 
-    // ✅ 发送决定（此函数内部已包含：立即发用户消息 + 延迟发回复）
-    sendLetHimDecide(question, result);
+    // 启动决策流程（发送用户消息 + 定时抽签 + 回复）
+    startDecisionProcess(question);
 
-    // ✅ 关闭抽签模态框（无动画）
+    // 关闭抽签弹窗
     const modal = document.getElementById('wheel-modal');
     if (modal && typeof hideModal === 'function') {
         hideModal(modal);
@@ -1156,8 +1155,8 @@ function handleLetHimDecide() {
     // 清空输入框
     if (input) input.value = '';
 
-    // 注意：不要重置 wheelResultText，因为“开始抽签”可能独立使用它
-    // 但为了保持界面干净，可以重置抽签显示（反正弹窗已关闭）
+    // 清空结果状态
+    wheelResultText = '';
     const resultEl = document.getElementById('wheel-result');
     if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
     const sendBtn = document.getElementById('send-wheel-result');
@@ -1167,92 +1166,17 @@ function handleLetHimDecide() {
 }
 
 // =============================================
-// 独立群聊消息渲染（内嵌在函数内，无需额外定义）
+// 2. 启动决策流程（发送用户消息 + 定时抽签）
 // =============================================
-function _renderGcMessage(msg) {
-    const box = document.getElementById('gcBox');
-    if (!box) {
-        console.warn('[renderGcMessage] gcBox 不存在');
-        return false;
-    }
-    if (box.style.display === 'none') {
-        box.style.display = '';
-    }
-
-    const isMine = msg.sender === 'me';
-    const name = isMine
-        ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
-        : (msg.memberName || '群成员');
-
-    let avatarStyle = '';
-    if (!isMine) {
-        const member = (window.groupChatSettings?.members || []).find(m => 'gc_' + m.id === msg.sender);
-        if (member && member.avatar) {
-            avatarStyle = `background-image:url(${member.avatar});background-size:cover;background-position:center;`;
-        } else {
-            avatarStyle = 'background:#e0d4f7;';
-        }
-    }
-
-    let content = msg.text || '';
-    if (msg.type === 'image') content = `<img src="${msg.content}" class="msg-image" loading="lazy">`;
-    else if (msg.type === 'sticker') content = `<img src="${msg.content}" class="msg-sticker" loading="lazy">`;
-    else if (msg.type === 'doodle') content = `<img src="${msg.content}" class="msg-image" loading="lazy">`;
-
-    const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN', {
-        hour: '2-digit', minute: '2-digit'
-    }) : '';
-
-    const html = `
-        <div class="message ${isMine ? 'mine' : 'other'}" data-id="${msg.id}">
-            <div class="gc-msg-avatar ${isMine ? 'gc-avatar-me' : ''}" style="${isMine ? '' : avatarStyle}"></div>
-            <div class="bubble-wrap">
-                ${isMine ? '' : `<div class="gc-msg-name">${name}</div>`}
-                <div class="bubble">${content}</div>
-                <div class="msg-meta"><span class="time">${timeStr}</span></div>
-            </div>
-        </div>
-    `;
-
-    box.insertAdjacentHTML('beforeend', html);
-    box.scrollTop = box.scrollHeight;
-    return true;
-}
-
-// =============================================
-// 主函数：让他决定
-// =============================================
-function sendLetHimDecide(question, result) {
-    console.log('[让他决定] 函数被调用，当前模式:', window._gcMode);
-
-    // 群聊检测：使用 groupChatSettings.enabled
+function startDecisionProcess(question) {
+    // 判断模式
     const isGroupMode = window.groupChatSettings && window.groupChatSettings.enabled === true;
-    console.log('[让他决定] isGroupMode:', isGroupMode);
 
-    // =============================================
-    // 群聊模式
-    // =============================================
+    // --- 2.1 发送用户消息（立即） ---
+    let storeName, userMsg;
     if (isGroupMode) {
-        const members = window.groupChatSettings?.members || [];
-        console.log('[让他决定] 群成员列表:', members);
-
-        if (members.length === 0) {
-            if (typeof showNotification === 'function') {
-                showNotification('群聊中没有成员，无法让他决定', 'warning');
-            }
-            return;
-        }
-
-        // 决定回复人数（1~3 人，不超过总人数）
-        const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
-        console.log(`[让他决定] 群聊共有 ${members.length} 位成员，将随机选择 ${replyCount} 位回复`);
-
-        const shuffled = [...members].sort(() => Math.random() - 0.5);
-        const selectedMembers = shuffled.slice(0, replyCount);
-        console.log('[让他决定] 选中的成员：', selectedMembers.map(m => m.name).join(', '));
-
-        // ===== 用户消息 =====
-        const userMsg = {
+        storeName = 'gcMessages';
+        userMsg = {
             id: Date.now() + Math.random(),
             sender: 'me',
             type: 'normal',
@@ -1263,24 +1187,89 @@ function sendLetHimDecide(question, result) {
             note: null,
             replyTo: null
         };
+    } else {
+        storeName = 'chatMessages';
+        userMsg = {
+            id: Date.now() + Math.random(),
+            sender: 'user',
+            type: 'normal',
+            text: `让他决定：${question}`,
+            timestamp: new Date(),
+            status: 'sent',
+            favorited: false,
+            note: null,
+            replyTo: null
+        };
+    }
 
-        console.log('[让他决定] 正在存储用户消息...');
-        _storeMessage('gcMessages', userMsg).then(() => {
-            console.log('[让他决定] 用户消息存储成功，尝试渲染');
-            // 使用 core.js 的 addMessage 或直接操作容器
+    // 存储并渲染用户消息
+    _storeMessage(storeName, userMsg).then(() => {
+        if (isGroupMode) {
             _renderGroupMessage(userMsg, true);
-        }).catch(err => {
-            console.error('[让他决定] 存储用户消息失败:', err);
-        });
+            if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+        } else {
+            if (typeof addMessage === 'function') {
+                addMessage(userMsg);
+            } else if (typeof appendMessageToUI === 'function') {
+                appendMessageToUI(userMsg, '已送达');
+            }
+        }
+    });
 
-        // ===== 每位成员的回复 =====
+    // --- 2.2 模拟已读回执（与原生 sendMessage 一致） ---
+    const msgId = userMsg.id;
+    setTimeout(() => {
+        // 尝试从 messages 或 gcMessages 中查找并更新状态
+        if (isGroupMode) {
+            // 群聊没有已读机制，但我们可以模拟（仅更新界面，不实际存储）
+            // 简单起见，仅打印日志，不处理
+        } else {
+            const msg = messages.find(m => m.id === msgId);
+            if (msg) {
+                msg.status = 'read';
+                if (typeof _updateReadReceiptsDOM === 'function') _updateReadReceiptsDOM();
+                if (typeof throttledSaveData === 'function') throttledSaveData();
+            }
+        }
+    }, 1500 + Math.random() * 2500);
+
+    // --- 2.3 设置延迟定时器（10~60秒后执行抽签并回复） ---
+    const delay = 10000 + Math.random() * 50000; // 10~60秒
+    console.log(`[让他决定] 将在 ${Math.round(delay/1000)} 秒后抽签并回复`);
+
+    setTimeout(() => {
+        // 从选项列表中均匀随机抽取一个结果
+        const result = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
+        console.log(`[让他决定] 抽签结果：${result}`);
+
+        // 立即发送回复（单聊/群聊）
+        sendReply(question, result, isGroupMode);
+    }, delay);
+}
+
+// =============================================
+// 3. 发送回复（无延迟，立即执行）
+// =============================================
+function sendReply(question, result, isGroupMode) {
+    if (isGroupMode) {
+        // --- 群聊：随机选择 1~3 位成员，各自独立抽签回复 ---
+        const members = window.groupChatSettings?.members || [];
+        if (members.length === 0) {
+            if (typeof showNotification === 'function') {
+                showNotification('群聊中没有成员，无法让他决定', 'warning');
+            }
+            return;
+        }
+
+        const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
+        const shuffled = [...members].sort(() => Math.random() - 0.5);
+        const selectedMembers = shuffled.slice(0, replyCount);
+
         selectedMembers.forEach((member, index) => {
+            // 每位成员独立抽签
             const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
-            const baseDelay = 10000 + Math.random() * 50000; // 10~60 秒
-            const offset = index * 2000 + Math.random() * 3000;
-            const delay = baseDelay + offset;
-
-            console.log(`[让他决定] ${member.name} 将在 ${Math.round(delay/1000)} 秒后回复，结果为：${memberResult}`);
+            // 成员间错开 0~2 秒，避免同时刷屏
+            const offset = index * 500 + Math.random() * 1500;
 
             setTimeout(() => {
                 const replyMsg = {
@@ -1296,63 +1285,18 @@ function sendLetHimDecide(question, result) {
                     replyTo: null
                 };
 
-                console.log('[让他决定] 正在存储回复消息:', replyMsg);
                 _storeMessage('gcMessages', replyMsg).then(() => {
-                    console.log('[让他决定] 回复消息存储成功，尝试渲染');
                     _renderGroupMessage(replyMsg, false);
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
                     }
-                }).catch(err => {
-                    console.error('[让他决定] 存储回复消息失败:', err);
                 });
-            }, delay);
+            }, offset);
         });
-
-        // 清空界面状态
-        const input = document.getElementById('wheel-decision-input');
-        if (input) input.value = '';
-        wheelResultText = '';
-        const resultEl = document.getElementById('wheel-result');
-        if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
-        const sendBtn = document.getElementById('send-wheel-result');
-        if (sendBtn) sendBtn.style.display = 'none';
-        const spinBtn = document.getElementById('spin-wheel-btn');
-        if (spinBtn) spinBtn.disabled = false;
-
-        return; // 群聊处理完毕
-    }
-
-    // =============================================
-    // 单聊模式（保持原有逻辑不变）
-    // =============================================
-    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
-
-    // 用户消息（立即发送）
-    const userMsg = {
-        id: Date.now() + Math.random(),
-        sender: 'user',
-        type: 'normal',
-        text: `让他决定：${question}`,
-        timestamp: new Date(),
-        status: 'sent',
-        favorited: false,
-        note: null,
-        replyTo: null
-    };
-
-    if (typeof addMessage === 'function') {
-        addMessage(userMsg);
     } else {
-        _storeMessage('chatMessages', userMsg).then(() => {
-            if (typeof appendMessageToUI === 'function') appendMessageToUI(userMsg, '已送达');
-        });
-    }
-
-    // 对方回复（延迟 10~60 秒）
-    const delay = 10000 + Math.random() * 50000;
-    setTimeout(() => {
+        // --- 单聊：直接回复 ---
+        const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
         const replyMsg = {
             id: Date.now() + Math.random(),
             sender: partnerName,
@@ -1379,22 +1323,11 @@ function sendLetHimDecide(question, result) {
         if (typeof playSound === 'function') {
             playSound('message');
         }
-    }, delay);
-
-    // 清空界面状态
-    const input = document.getElementById('wheel-decision-input');
-    if (input) input.value = '';
-    wheelResultText = '';
-    const resultEl = document.getElementById('wheel-result');
-    if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
-    const sendBtn = document.getElementById('send-wheel-result');
-    if (sendBtn) sendBtn.style.display = 'none';
-    const spinBtn = document.getElementById('spin-wheel-btn');
-    if (spinBtn) spinBtn.disabled = false;
+    }
 }
 
 // =============================================
-// 辅助函数：渲染群聊消息到 chat-container
+// 辅助：渲染群聊消息（与之前相同，但已包含在 sendLetHimDecide 中，现在单独提出来）
 // =============================================
 function _renderGroupMessage(msg, isMine) {
     const container = document.getElementById('chat-container');
@@ -1403,7 +1336,6 @@ function _renderGroupMessage(msg, isMine) {
         return false;
     }
 
-    // 如果是群聊，确保显示群聊模式（隐藏单聊的 empty-state 等）
     const emptyState = document.getElementById('empty-state');
     if (emptyState) emptyState.style.display = 'none';
 
@@ -1412,7 +1344,6 @@ function _renderGroupMessage(msg, isMine) {
         ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
         : (msg.memberName || '群成员');
 
-    // 获取成员头像（如果是群成员）
     let avatarHtml = '';
     if (!isUser && msg.sender && msg.sender.startsWith('gc_')) {
         const memberId = msg.sender.replace('gc_', '');
@@ -1436,22 +1367,18 @@ function _renderGroupMessage(msg, isMine) {
         hour: '2-digit', minute: '2-digit'
     }) : '';
 
-    // 构建消息包装器（与 core.js 中 message-wrapper 结构一致）
     const wrapper = document.createElement('div');
     wrapper.className = `message-wrapper ${isUser ? 'sent' : 'received'}`;
     wrapper.dataset.id = msg.id;
 
-    // 头像
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'message-avatar';
     avatarDiv.innerHTML = avatarHtml;
     wrapper.appendChild(avatarDiv);
 
-    // 内容包装
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content-wrapper';
 
-    // 群聊显示发送者名字（仅对方消息）
     if (!isUser && msg.memberName) {
         const nameLabel = document.createElement('div');
         nameLabel.className = 'group-sender-name';
@@ -1459,13 +1386,11 @@ function _renderGroupMessage(msg, isMine) {
         contentWrapper.appendChild(nameLabel);
     }
 
-    // 消息气泡
     const bubble = document.createElement('div');
     bubble.className = `message message-${isUser ? 'sent' : 'received'} ${settings?.bubbleStyle || 'standard'}`;
     bubble.innerHTML = content;
     contentWrapper.appendChild(bubble);
 
-    // 时间戳
     const meta = document.createElement('div');
     meta.className = 'message-meta';
     meta.innerHTML = `<div class="timestamp">${timeStr}</div>`;
@@ -1474,10 +1399,7 @@ function _renderGroupMessage(msg, isMine) {
     wrapper.appendChild(contentWrapper);
     container.appendChild(wrapper);
 
-    // 滚动到底部
     container.scrollTop = container.scrollHeight;
-
-    console.log('[renderGroupMessage] 消息已添加到 chat-container');
     return true;
 }
 
