@@ -1180,7 +1180,8 @@ function sendLetHimDecide(question, result) {
     // 群聊模式
     // =============================================
     if (isGroupMode) {
-        const members = window.cachedGcMembers || [];
+        // ✅ 从 groupChatSettings.members 获取群成员
+        const members = window.groupChatSettings?.members || [];
         console.log('[让他决定] 群成员列表:', members);
 
         if (members.length === 0) {
@@ -1227,8 +1228,10 @@ function sendLetHimDecide(question, result) {
 
         // ===== 每位成员的回复 =====
         selectedMembers.forEach((member, index) => {
+            // 每位成员独立随机抽取
             const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
-            const baseDelay = 10000 + Math.random() * 50000; // 10~60 秒
+            // 基础延迟 10~60 秒（根据你设置）
+            const baseDelay = 10000 + Math.random() * 50000;
             const offset = index * 2000 + Math.random() * 3000;
             const delay = baseDelay + offset;
 
@@ -1284,7 +1287,68 @@ function sendLetHimDecide(question, result) {
     // =============================================
     // 单聊模式（保持不变）
     // =============================================
-    // ... 你原有的单聊代码（这里省略，但请保留）
+    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
+
+    // 用户消息（立即发送）
+    const userMsg = {
+        sender: 'user',
+        type: 'normal',
+        text: `让他决定：${question}`,
+        timestamp: new Date(),
+        status: 'sent',
+        favorited: false,
+        note: null,
+        replyTo: null
+    };
+
+    if (typeof addMessage === 'function') {
+        addMessage(userMsg);
+    } else {
+        _storeMessage('chatMessages', userMsg).then(() => {
+            if (typeof appendMessageToUI === 'function') appendMessageToUI(userMsg, '已送达');
+        });
+    }
+
+    // 对方回复（延迟 10~60 秒）
+    const delay = 10000 + Math.random() * 50000;
+    setTimeout(() => {
+        const replyMsg = {
+            sender: partnerName,
+            type: 'normal',
+            text: `关于“${question}”，我的决定是：${result}`,
+            timestamp: new Date(),
+            status: 'received',
+            favorited: false,
+            note: null,
+            replyTo: null
+        };
+
+        if (typeof addMessage === 'function') {
+            addMessage(replyMsg);
+        } else {
+            _storeMessage('chatMessages', replyMsg).then(() => {
+                if (typeof appendMessageToUI === 'function') appendMessageToUI(replyMsg, '');
+            });
+        }
+
+        if (typeof showNotification === 'function') {
+            showNotification(`${partnerName} 已回复你的决定 ✨`, 'success', 3000);
+        }
+        if (typeof playSound === 'function') {
+            playSound('message');
+        }
+    }, delay);
+
+    // 清空界面状态
+    const input = document.getElementById('wheel-decision-input');
+    if (input) input.value = '';
+    wheelResultText = '';
+    const resultEl = document.getElementById('wheel-result');
+    if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
+    const sendBtn = document.getElementById('send-wheel-result');
+    if (sendBtn) sendBtn.style.display = 'none';
+    const spinBtn = document.getElementById('spin-wheel-btn');
+    if (spinBtn) spinBtn.disabled = false;
 }
 
 function doPick() {
