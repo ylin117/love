@@ -1137,15 +1137,33 @@ function handleLetHimDecide() {
         return;
     }
 
-    // 如果还没有抽签结果，则先触发抽签，并标记待发送
-    if (!wheelResultText) {
-        _pendingLetHimDecide = true;
-        _pendingQuestion = question;
-        doPick(); // 抽签动画结束后会自动检测 _pendingLetHimDecide
-    } else {
-        // 已有结果，直接发送
-        sendLetHimDecide(question, wheelResultText);
+    // 直接从选项列表中随机选一个结果（不带动画，独立选取）
+    if (!wheelOptions || wheelOptions.length === 0) {
+        showNotification('请先添加选项', 'warning');
+        return;
     }
+    const result = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
+
+    // ✅ 发送决定（此函数内部已包含：立即发用户消息 + 延迟发回复）
+    sendLetHimDecide(question, result);
+
+    // ✅ 关闭抽签模态框（无动画）
+    const modal = document.getElementById('wheel-modal');
+    if (modal && typeof hideModal === 'function') {
+        hideModal(modal);
+    }
+
+    // 清空输入框
+    if (input) input.value = '';
+
+    // 注意：不要重置 wheelResultText，因为“开始抽签”可能独立使用它
+    // 但为了保持界面干净，可以重置抽签显示（反正弹窗已关闭）
+    const resultEl = document.getElementById('wheel-result');
+    if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
+    const sendBtn = document.getElementById('send-wheel-result');
+    if (sendBtn) sendBtn.style.display = 'none';
+    const spinBtn = document.getElementById('spin-wheel-btn');
+    if (spinBtn) spinBtn.disabled = false;
 }
 
 /**
