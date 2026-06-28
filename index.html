@@ -1970,6 +1970,56 @@
                 </div>
                 <div class="picker-controls">
                     <div class="picker-options-label">选项列表（至少 2 项）</div>
+                    <div class="modal" id="wheel-modal">
+                        <div class="modal-content">
+                            <div class="modal-title">
+                                <i class="fas fa-magic"></i><span>随机抽签</span>
+                            </div>
+                    
+                            <div class="picker-wrapper">
+                                <div class="picker-box-stage">
+                                    <div class="picker-cards-row" id="picker-cards-row"></div>
+                                    <div class="picker-result-text" id="wheel-result"></div>
+                                </div>
+                    
+                                <div class="picker-controls">
+                                    <div class="picker-options-label">选项列表（至少 2 项）</div>
+                    
+                                    <!-- ✅ 输入框：放在选项列表上方 -->
+                                    <div style="margin: 6px 0 10px;">
+                                        <input type="text" id="wheel-decision-input" class="form-input"
+                                               placeholder="让他帮你决定"
+                                               style="width:100%; padding:10px 14px; border-radius:10px;
+                                                      background:var(--primary-bg); color:var(--text-primary);
+                                                      border:1px solid var(--border-color); outline:none;
+                                                      font-family:var(--font-family); font-size:14px;">
+                                    </div>
+                    
+                                    <div class="picker-options-list" id="wheel-options-list"></div>
+                                    <button class="modal-btn modal-btn-secondary picker-add-btn" id="add-wheel-option">
+                                        <i class="fas fa-plus"></i> 添加选项
+                                    </button>
+                                </div>
+                            </div>
+                    
+                            <div class="modal-buttons">
+                                <button class="modal-btn modal-btn-secondary" id="close-wheel">关闭</button>
+                                <button class="modal-btn modal-btn-primary" id="spin-wheel-btn">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px">
+                                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 12a10 10 0 0 1 18.8-3.6M22 12a10 10 0 0 1-18.8 3.6"/>
+                                    </svg> 开始抽签
+                                </button>
+                    
+                                <!-- ✅ “让他决定”按钮：样式与“开始抽签”一致 -->
+                                <button class="modal-btn modal-btn-primary" id="let-him-decide-btn"
+                                        style="display:inline-flex; align-items:center; gap:6px;">
+                                    <i class="fas fa-user-check"></i> 让他决定
+                                </button>
+                    
+                                <button class="modal-btn modal-btn-primary" id="send-wheel-result" style="display:none;">发送结果</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="picker-options-list" id="wheel-options-list"></div>
                     <button class="modal-btn modal-btn-secondary picker-add-btn" id="add-wheel-option">
                         <i class="fas fa-plus"></i> 添加选项
