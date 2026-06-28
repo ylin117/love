@@ -1149,85 +1149,45 @@ function handleLetHimDecide() {
 }
 
 /**
- * 发送“让他决定”到当前聊天
+ * 发送“让他决定”到主聊天（梦角）
  */
 function sendLetHimDecide(question, result) {
-    // 判断当前聊天模式
-    const mode = window._gcMode !== undefined ? window._gcMode : 0; // 0=单聊, 1=群聊, 2=密聊
-    const pmMember = window._pmMember || null;
+    // 获取对方名字（从全局 settings 中读取）
+    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '梦角';
+    const myName = (typeof settings !== 'undefined' && settings.myName) ? settings.myName : '我';
 
-    if (mode === 0) {
-        // 主角色单聊：发送给 Sean
-        // 1) 用户消息
-        const userMsg = {
-            sender: 'me',
-            type: 'text',
-            text: `让他决定：${question}`,
-            timestamp: Date.now(),
-            quote: null
-        };
-        _storeMessage('messages', userMsg).then(() => {
-           const chatView = document.getElementById('view-chat');
-            if (chatView && chatView.classList.contains('active') && _gcMode === 0) {appendMessageToUI(userMsg, '已送达');
-            }
-        });
+    // 1. 发送用户的消息（“让他决定：xxx”）
+    const userMsg = {
+        id: Date.now() + Math.random(),
+        sender: 'user',
+        text: `让他决定：${question}`,
+        timestamp: new Date(),
+        status: 'sent',
+        type: 'normal'
+    };
+    addMessage(userMsg);
 
-        // 2) Sean 的回复
-        const seanMsg = {
-            sender: 'sean',
-            type: 'text',
-            text: `关于“${question}”，我的决定是：${result}`,
-            timestamp: Date.now(),
-            quote: null
-        };
-        _storeMessage('messages', seanMsg).then(() => {
-            const chatView = document.getElementById('view-chat');
-            if (chatView && chatView.classList.contains('active') && _gcMode === 0) {
-            appendMessageToUI(seanMsg, '');
-            }
-            playNotifySound(seanName, '做出了决定');
-            showNotification('对方已回复你的决定 ✨', 'success', 2000);
-        });
-
-    } else if (mode === 2 && pmMember) {
-        // 密聊模式：发送给当前密聊对象
-        const targetId = pmMember.id;
-        // 用户消息
-        const userMsg = {
-            sender: 'me',
-            type: 'text',
-            text: `让他决定：${question}`,
-            pm: targetId,
-            timestamp: Date.now()
-        };
-        _storeMessage('gcMessages', userMsg);
-
-        // 对方回复
+    // 2. 延迟一点，发送对方的回复
+    // 模拟对方正在输入的效果（参考 simulateReply 的延迟）
+    const replyDelay = 1500 + Math.random() * 2500; // 1.5~4秒后回复
+    setTimeout(() => {
         const replyMsg = {
-            sender: 'gc_' + targetId,
-            memberName: pmMember.name,
-            type: 'text',
+            id: Date.now() + Math.random(),
+            sender: partnerName, // 发送者为对方
             text: `关于“${question}”，我的决定是：${result}`,
-            pm: targetId,
-            timestamp: Date.now()
+            timestamp: new Date(),
+            status: 'received',
+            type: 'normal'
         };
-        _storeMessage('gcMessages', replyMsg).then(() => {
-            const chatView = document.getElementById('view-chat');
-            if (_gcMode === 2 && _pmMember && _pmMember.id === targetId &&
-            chatView && chatView.classList.contains('active')) {
-            appendGcMessageToUI(replyMsg);
-            scrollGcToBottom();
-            }
-            playNotifySound(pmMember.name, '做出了决定');
-            showNotification(`${pmMember.name} 已回复你的决定 ✨`, 'success', 2000);
-        });
+        addMessage(replyMsg);
+        // 可选：播放通知
+        if (typeof playSound === 'function') playSound('message');
+        if (typeof showNotification === 'function') {
+            showNotification(`${partnerName} 已回复你的决定 ✨`, 'success', 2000);
+        }
+    }, replyDelay);
 
-    } else {
-        // 群聊或其他模式：暂不支持，或可提示
-        showNotification('该功能目前仅支持单聊和密聊', 'warning');
-    }
-
-    // 清空输入框和结果（可选）
+    // 清空 UI 状态
     const input = document.getElementById('wheel-decision-input');
     if (input) input.value = '';
     wheelResultText = '';
