@@ -1187,7 +1187,7 @@ function sendLetHimDecide(question, result) {
 
     // 2. 延迟一点，发送对方的回复
     // 模拟对方正在输入的效果（参考 simulateReply 的延迟）
-    const replyDelay = 1500 + Math.random() * 2500; // 1.5~4秒后回复
+    const replyDelay = 15000 + Math.random() * 45000; // 15~60秒
     setTimeout(() => {
         const replyMsg = {
             id: Date.now() + Math.random(),
@@ -1263,7 +1263,7 @@ function doPick() {
         });
         
         flashCount++;
-        const delay = 15000 + Math.random() * 45000; // 15~60秒
+        const delay = flashCount < 8 ? 80 : flashCount < 14 ? 130 : 250;
         if (flashCount < totalFlashes) {
             setTimeout(flash, delay);
         } else {
