@@ -1171,6 +1171,7 @@ function handleLetHimDecide() {
  */
 function sendLetHimDecide(question, result) {
     const mode = window._gcMode !== undefined ? window._gcMode : 0;
+
     // =============================================
     // 群聊模式
     // =============================================
@@ -1185,9 +1186,12 @@ function sendLetHimDecide(question, result) {
 
         // 1. 决定回复人数（1~3 人，不超过总人数）
         const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
+        console.log(`[让他决定] 群聊共有 ${members.length} 位成员，将随机选择 ${replyCount} 位回复`);
+
         // 打乱成员列表，取前 replyCount 位
         const shuffled = [...members].sort(() => Math.random() - 0.5);
         const selectedMembers = shuffled.slice(0, replyCount);
+        console.log('[让他决定] 选中的成员：', selectedMembers.map(m => m.name).join(', '));
 
         // 2. 用户消息（立即发送）
         const userMsg = {
@@ -1208,19 +1212,24 @@ function sendLetHimDecide(question, result) {
             }
         });
 
-        // 3. 每位选中的成员延迟回复（错开时间）
+        // 3. 每位选中的成员独立随机抽签并延迟回复
         selectedMembers.forEach((member, index) => {
+            // 每位成员独立从选项列表中随机抽取（即使结果相同也无妨，但这里是独立随机）
+            const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
+
             // 基础延迟 10~60 秒，每位成员额外错开 0~5 秒
             const baseDelay = 10000 + Math.random() * 45000;
             const offset = index * 2000 + Math.random() * 3000;
             const delay = baseDelay + offset;
+
+            console.log(`[让他决定] ${member.name} 将在 ${Math.round(delay/1000)} 秒后回复，结果为：${memberResult}`);
 
             setTimeout(() => {
                 const replyMsg = {
                     sender: 'gc_' + member.id,
                     memberName: member.name,
                     type: 'normal',
-                    text: `关于“${question}”，我的决定是：${result}`,
+                    text: `关于“${question}”，我的决定是：${memberResult}`,
                     timestamp: new Date(),
                     status: 'received',
                     favorited: false,
@@ -1233,13 +1242,12 @@ function sendLetHimDecide(question, result) {
                         appendGcMessageToUI(replyMsg);
                         if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
                     }
-                    // 提示音
                     if (typeof playSound === 'function') {
                         playSound('message');
                     }
-                    // 页面内通知（仅显示第一位成员的通知，避免刷屏）
+                    // 仅第一位成员触发通知，避免刷屏
                     if (index === 0 && typeof showNotification === 'function') {
-                        showNotification(`${member.name} 等 ${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
+                        showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
                     }
                 });
             }, delay);
@@ -1256,11 +1264,11 @@ function sendLetHimDecide(question, result) {
         const spinBtn = document.getElementById('spin-wheel-btn');
         if (spinBtn) spinBtn.disabled = false;
 
-        return; // 群聊处理完毕，不再执行下面的单聊逻辑
+        return; // 群聊处理完毕
     }
 
     // =============================================
-    // 单聊模式（保持不变，仅微调）
+    // 单聊模式（保持不变）
     // =============================================
     const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
 
