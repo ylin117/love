@@ -1170,42 +1170,151 @@ function handleLetHimDecide() {
  * 发送“让他决定”到主聊天（梦角）
  */
 function sendLetHimDecide(question, result) {
-    // 获取对方名字（从全局 settings 中读取）
-    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '梦角';
-    const myName = (typeof settings !== 'undefined' && settings.myName) ? settings.myName : '我';
+    const mode = window._gcMode !== undefined ? window._gcMode : 0;
+    // =============================================
+    // 群聊模式
+    // =============================================
+    if (mode === 1) {
+        const members = window.cachedGcMembers || [];
+        if (members.length === 0) {
+            if (typeof showNotification === 'function') {
+                showNotification('群聊中没有成员，无法让他决定', 'warning');
+            }
+            return;
+        }
 
-    // 1. 发送用户的消息（“让他决定：xxx”）
+        // 1. 决定回复人数（1~3 人，不超过总人数）
+        const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
+        // 打乱成员列表，取前 replyCount 位
+        const shuffled = [...members].sort(() => Math.random() - 0.5);
+        const selectedMembers = shuffled.slice(0, replyCount);
+
+        // 2. 用户消息（立即发送）
+        const userMsg = {
+            sender: 'me',
+            type: 'normal',
+            text: `让他决定：${question}`,
+            timestamp: new Date(),
+            status: 'sent',
+            favorited: false,
+            note: null,
+            replyTo: null
+        };
+
+        _storeMessage('gcMessages', userMsg).then(() => {
+            if (typeof appendGcMessageToUI === 'function') {
+                appendGcMessageToUI(userMsg);
+                if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+            }
+        });
+
+        // 3. 每位选中的成员延迟回复（错开时间）
+        selectedMembers.forEach((member, index) => {
+            // 基础延迟 10~60 秒，每位成员额外错开 0~5 秒
+            const baseDelay = 10000 + Math.random() * 45000;
+            const offset = index * 2000 + Math.random() * 3000;
+            const delay = baseDelay + offset;
+
+            setTimeout(() => {
+                const replyMsg = {
+                    sender: 'gc_' + member.id,
+                    memberName: member.name,
+                    type: 'normal',
+                    text: `关于“${question}”，我的决定是：${result}`,
+                    timestamp: new Date(),
+                    status: 'received',
+                    favorited: false,
+                    note: null,
+                    replyTo: null
+                };
+
+                _storeMessage('gcMessages', replyMsg).then(() => {
+                    if (typeof appendGcMessageToUI === 'function') {
+                        appendGcMessageToUI(replyMsg);
+                        if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+                    }
+                    // 提示音
+                    if (typeof playSound === 'function') {
+                        playSound('message');
+                    }
+                    // 页面内通知（仅显示第一位成员的通知，避免刷屏）
+                    if (index === 0 && typeof showNotification === 'function') {
+                        showNotification(`${member.name} 等 ${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
+                    }
+                });
+            }, delay);
+        });
+
+        // 清空界面状态
+        const input = document.getElementById('wheel-decision-input');
+        if (input) input.value = '';
+        wheelResultText = '';
+        const resultEl = document.getElementById('wheel-result');
+        if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
+        const sendBtn = document.getElementById('send-wheel-result');
+        if (sendBtn) sendBtn.style.display = 'none';
+        const spinBtn = document.getElementById('spin-wheel-btn');
+        if (spinBtn) spinBtn.disabled = false;
+
+        return; // 群聊处理完毕，不再执行下面的单聊逻辑
+    }
+
+    // =============================================
+    // 单聊模式（保持不变，仅微调）
+    // =============================================
+    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
+
+    // 用户消息（立即发送）
     const userMsg = {
-        id: Date.now() + Math.random(),
         sender: 'user',
+        type: 'normal',
         text: `让他决定：${question}`,
         timestamp: new Date(),
         status: 'sent',
-        type: 'normal'
+        favorited: false,
+        note: null,
+        replyTo: null
     };
-    addMessage(userMsg);
 
-    // 2. 延迟一点，发送对方的回复
-    // 模拟对方正在输入的效果（参考 simulateReply 的延迟）
-    const replyDelay = 15000 + Math.random() * 45000; // 15~60秒
+    if (typeof addMessage === 'function') {
+        addMessage(userMsg);
+    } else {
+        _storeMessage('chatMessages', userMsg).then(() => {
+            if (typeof appendMessageToUI === 'function') appendMessageToUI(userMsg, '已送达');
+        });
+    }
+
+    // 对方回复（延迟 10~60 秒）
+    const delay = 10000 + Math.random() * 45000;
     setTimeout(() => {
         const replyMsg = {
-            id: Date.now() + Math.random(),
-            sender: partnerName, // 发送者为对方
+            sender: partnerName,
+            type: 'normal',
             text: `关于“${question}”，我的决定是：${result}`,
             timestamp: new Date(),
             status: 'received',
-            type: 'normal'
+            favorited: false,
+            note: null,
+            replyTo: null
         };
-        addMessage(replyMsg);
-        // 可选：播放通知
-        if (typeof playSound === 'function') playSound('message');
-        if (typeof showNotification === 'function') {
-            showNotification(`${partnerName} 已回复你的决定 ✨`, 'success', 2000);
-        }
-    }, replyDelay);
 
-    // 清空 UI 状态
+        if (typeof addMessage === 'function') {
+            addMessage(replyMsg);
+        } else {
+            _storeMessage('chatMessages', replyMsg).then(() => {
+                if (typeof appendMessageToUI === 'function') appendMessageToUI(replyMsg, '');
+            });
+        }
+
+        if (typeof showNotification === 'function') {
+            showNotification(`${partnerName} 已回复你的决定 ✨`, 'success', 3000);
+        }
+        if (typeof playSound === 'function') {
+            playSound('message');
+        }
+    }, delay);
+
+    // 清空界面状态
     const input = document.getElementById('wheel-decision-input');
     if (input) input.value = '';
     wheelResultText = '';
