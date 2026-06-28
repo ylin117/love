@@ -1243,13 +1243,6 @@ function sendLetHimDecide(question, result) {
             return;
         }
 
-        // 确保 gcBox 可见
-        const box = document.getElementById('gcBox');
-        if (box) {
-            box.style.display = '';
-            console.log('[让他决定] gcBox 已显示');
-        }
-
         // 决定回复人数（1~3 人，不超过总人数）
         const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
         console.log(`[让他决定] 群聊共有 ${members.length} 位成员，将随机选择 ${replyCount} 位回复`);
@@ -1260,6 +1253,7 @@ function sendLetHimDecide(question, result) {
 
         // ===== 用户消息 =====
         const userMsg = {
+            id: Date.now() + Math.random(),
             sender: 'me',
             type: 'normal',
             text: `让他决定：${question}`,
@@ -1273,7 +1267,8 @@ function sendLetHimDecide(question, result) {
         console.log('[让他决定] 正在存储用户消息...');
         _storeMessage('gcMessages', userMsg).then(() => {
             console.log('[让他决定] 用户消息存储成功，尝试渲染');
-            _renderGcMessage(userMsg);
+            // 使用 core.js 的 addMessage 或直接操作容器
+            _renderGroupMessage(userMsg, true);
         }).catch(err => {
             console.error('[让他决定] 存储用户消息失败:', err);
         });
@@ -1289,6 +1284,7 @@ function sendLetHimDecide(question, result) {
 
             setTimeout(() => {
                 const replyMsg = {
+                    id: Date.now() + Math.random() + index,
                     sender: 'gc_' + member.id,
                     memberName: member.name,
                     type: 'normal',
@@ -1303,7 +1299,7 @@ function sendLetHimDecide(question, result) {
                 console.log('[让他决定] 正在存储回复消息:', replyMsg);
                 _storeMessage('gcMessages', replyMsg).then(() => {
                     console.log('[让他决定] 回复消息存储成功，尝试渲染');
-                    _renderGcMessage(replyMsg);
+                    _renderGroupMessage(replyMsg, false);
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
@@ -1335,6 +1331,7 @@ function sendLetHimDecide(question, result) {
 
     // 用户消息（立即发送）
     const userMsg = {
+        id: Date.now() + Math.random(),
         sender: 'user',
         type: 'normal',
         text: `让他决定：${question}`,
@@ -1357,6 +1354,7 @@ function sendLetHimDecide(question, result) {
     const delay = 10000 + Math.random() * 50000;
     setTimeout(() => {
         const replyMsg = {
+            id: Date.now() + Math.random(),
             sender: partnerName,
             type: 'normal',
             text: `关于“${question}”，我的决定是：${result}`,
@@ -1393,6 +1391,94 @@ function sendLetHimDecide(question, result) {
     if (sendBtn) sendBtn.style.display = 'none';
     const spinBtn = document.getElementById('spin-wheel-btn');
     if (spinBtn) spinBtn.disabled = false;
+}
+
+// =============================================
+// 辅助函数：渲染群聊消息到 chat-container
+// =============================================
+function _renderGroupMessage(msg, isMine) {
+    const container = document.getElementById('chat-container');
+    if (!container) {
+        console.warn('[renderGroupMessage] chat-container 不存在');
+        return false;
+    }
+
+    // 如果是群聊，确保显示群聊模式（隐藏单聊的 empty-state 等）
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+
+    const isUser = isMine || msg.sender === 'me';
+    const senderName = isUser
+        ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
+        : (msg.memberName || '群成员');
+
+    // 获取成员头像（如果是群成员）
+    let avatarHtml = '';
+    if (!isUser && msg.sender && msg.sender.startsWith('gc_')) {
+        const memberId = msg.sender.replace('gc_', '');
+        const member = (window.groupChatSettings?.members || []).find(m => String(m.id) === String(memberId));
+        if (member && member.avatar) {
+            avatarHtml = `<img src="${member.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        } else {
+            avatarHtml = `<i class="fas fa-user" style="font-size:14px;color:var(--text-secondary);"></i>`;
+        }
+    } else {
+        avatarHtml = isUser
+            ? (document.querySelector('#my-avatar img') ? document.querySelector('#my-avatar img').outerHTML : '<i class="fas fa-user" style="font-size:14px;color:var(--text-secondary);"></i>')
+            : (document.querySelector('#partner-avatar img') ? document.querySelector('#partner-avatar img').outerHTML : '<i class="fas fa-user" style="font-size:14px;color:var(--text-secondary);"></i>');
+    }
+
+    let content = msg.text || '';
+    if (msg.type === 'image') content = `<img src="${msg.content}" class="message-image" style="max-width:200px;border-radius:12px;">`;
+    else if (msg.type === 'sticker') content = `<img src="${msg.content}" style="max-width:150px;border-radius:8px;">`;
+
+    const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
+        hour: '2-digit', minute: '2-digit'
+    }) : '';
+
+    // 构建消息包装器（与 core.js 中 message-wrapper 结构一致）
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper ${isUser ? 'sent' : 'received'}`;
+    wrapper.dataset.id = msg.id;
+
+    // 头像
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar';
+    avatarDiv.innerHTML = avatarHtml;
+    wrapper.appendChild(avatarDiv);
+
+    // 内容包装
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'message-content-wrapper';
+
+    // 群聊显示发送者名字（仅对方消息）
+    if (!isUser && msg.memberName) {
+        const nameLabel = document.createElement('div');
+        nameLabel.className = 'group-sender-name';
+        nameLabel.textContent = msg.memberName;
+        contentWrapper.appendChild(nameLabel);
+    }
+
+    // 消息气泡
+    const bubble = document.createElement('div');
+    bubble.className = `message message-${isUser ? 'sent' : 'received'} ${settings?.bubbleStyle || 'standard'}`;
+    bubble.innerHTML = content;
+    contentWrapper.appendChild(bubble);
+
+    // 时间戳
+    const meta = document.createElement('div');
+    meta.className = 'message-meta';
+    meta.innerHTML = `<div class="timestamp">${timeStr}</div>`;
+    contentWrapper.appendChild(meta);
+
+    wrapper.appendChild(contentWrapper);
+    container.appendChild(wrapper);
+
+    // 滚动到底部
+    container.scrollTop = container.scrollHeight;
+
+    console.log('[renderGroupMessage] 消息已添加到 chat-container');
+    return true;
 }
 
 function doPick() {
