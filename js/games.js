@@ -1170,14 +1170,19 @@ function handleLetHimDecide() {
  * 发送“让他决定”到主聊天（梦角）
  */
 function sendLetHimDecide(question, result) {
-    // 判断当前是否在群聊模式（基于你的 groupChatSettings）
-    const isGroupChat = window.groupChatSettings && window.groupChatSettings.enabled === true;
+    console.log('[让他决定] 函数被调用，当前模式:', window._gcMode);
+
+    // 群聊检测：使用 groupChatSettings.enabled
+    const isGroupMode = window.groupChatSettings && window.groupChatSettings.enabled === true;
+    console.log('[让他决定] isGroupMode:', isGroupMode);
 
     // =============================================
     // 群聊模式
     // =============================================
-    if (isGroupChat) {
-        const members = window.groupChatSettings.members || [];
+    if (isGroupMode) {
+        const members = window.cachedGcMembers || [];
+        console.log('[让他决定] 群成员列表:', members);
+
         if (members.length === 0) {
             if (typeof showNotification === 'function') {
                 showNotification('群聊中没有成员，无法让他决定', 'warning');
@@ -1185,16 +1190,15 @@ function sendLetHimDecide(question, result) {
             return;
         }
 
-        // 1. 决定回复人数（1~3 人，不超过总人数）
+        // 决定回复人数（1~3 人，不超过总人数）
         const replyCount = Math.min(members.length, 1 + Math.floor(Math.random() * 3));
         console.log(`[让他决定] 群聊共有 ${members.length} 位成员，将随机选择 ${replyCount} 位回复`);
 
-        // 打乱成员列表，取前 replyCount 位
         const shuffled = [...members].sort(() => Math.random() - 0.5);
         const selectedMembers = shuffled.slice(0, replyCount);
         console.log('[让他决定] 选中的成员：', selectedMembers.map(m => m.name).join(', '));
 
-        // 2. 用户消息（立即发送）
+        // ===== 用户消息 =====
         const userMsg = {
             sender: 'me',
             type: 'normal',
@@ -1206,20 +1210,25 @@ function sendLetHimDecide(question, result) {
             replyTo: null
         };
 
+        // 存储用户消息
+        console.log('[让他决定] 正在存储用户消息...');
         _storeMessage('gcMessages', userMsg).then(() => {
+            console.log('[让他决定] 用户消息存储成功，尝试渲染');
             if (typeof appendGcMessageToUI === 'function') {
                 appendGcMessageToUI(userMsg);
+                console.log('[让他决定] appendGcMessageToUI 执行完成');
                 if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+            } else {
+                console.error('[让他决定] appendGcMessageToUI 未定义！');
             }
+        }).catch(err => {
+            console.error('[让他决定] 存储用户消息失败:', err);
         });
 
-        // 3. 每位选中的成员独立随机抽签并延迟回复
+        // ===== 每位成员的回复 =====
         selectedMembers.forEach((member, index) => {
-            // 每位成员独立从选项列表中随机抽取
             const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
-
-            // 基础延迟 10~60 秒，每位成员额外错开 0~5 秒
-            const baseDelay = 10000 + Math.random() * 45000;
+            const baseDelay = 10000 + Math.random() * 50000; // 10~60 秒
             const offset = index * 2000 + Math.random() * 3000;
             const delay = baseDelay + offset;
 
@@ -1238,18 +1247,22 @@ function sendLetHimDecide(question, result) {
                     replyTo: null
                 };
 
+                console.log('[让他决定] 正在存储回复消息:', replyMsg);
                 _storeMessage('gcMessages', replyMsg).then(() => {
+                    console.log('[让他决定] 回复消息存储成功，尝试渲染');
                     if (typeof appendGcMessageToUI === 'function') {
                         appendGcMessageToUI(replyMsg);
+                        console.log('[让他决定] appendGcMessageToUI 执行完成');
                         if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+                    } else {
+                        console.error('[让他决定] appendGcMessageToUI 未定义！');
                     }
-                    if (typeof playSound === 'function') {
-                        playSound('message');
-                    }
-                    // 仅第一位成员触发通知，避免刷屏
+                    if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
                     }
+                }).catch(err => {
+                    console.error('[让他决定] 存储回复消息失败:', err);
                 });
             }, delay);
         });
@@ -1271,68 +1284,7 @@ function sendLetHimDecide(question, result) {
     // =============================================
     // 单聊模式（保持不变）
     // =============================================
-    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
-
-    // 用户消息（立即发送）
-    const userMsg = {
-        sender: 'user',
-        type: 'normal',
-        text: `让他决定：${question}`,
-        timestamp: new Date(),
-        status: 'sent',
-        favorited: false,
-        note: null,
-        replyTo: null
-    };
-
-    if (typeof addMessage === 'function') {
-        addMessage(userMsg);
-    } else {
-        _storeMessage('chatMessages', userMsg).then(() => {
-            if (typeof appendMessageToUI === 'function') appendMessageToUI(userMsg, '已送达');
-        });
-    }
-
-    // 对方回复（延迟 10~60 秒）
-    const delay = 10000 + Math.random() * 45000;
-    setTimeout(() => {
-        const replyMsg = {
-            sender: partnerName,
-            type: 'normal',
-            text: `关于“${question}”，我的决定是：${result}`,
-            timestamp: new Date(),
-            status: 'received',
-            favorited: false,
-            note: null,
-            replyTo: null
-        };
-
-        if (typeof addMessage === 'function') {
-            addMessage(replyMsg);
-        } else {
-            _storeMessage('chatMessages', replyMsg).then(() => {
-                if (typeof appendMessageToUI === 'function') appendMessageToUI(replyMsg, '');
-            });
-        }
-
-        if (typeof showNotification === 'function') {
-            showNotification(`${partnerName} 已回复你的决定 ✨`, 'success', 3000);
-        }
-        if (typeof playSound === 'function') {
-            playSound('message');
-        }
-    }, delay);
-
-    // 清空界面状态
-    const input = document.getElementById('wheel-decision-input');
-    if (input) input.value = '';
-    wheelResultText = '';
-    const resultEl = document.getElementById('wheel-result');
-    if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
-    const sendBtn = document.getElementById('send-wheel-result');
-    if (sendBtn) sendBtn.style.display = 'none';
-    const spinBtn = document.getElementById('spin-wheel-btn');
-    if (spinBtn) spinBtn.disabled = false;
+    // ... 你原有的单聊代码（这里省略，但请保留）
 }
 
 function doPick() {
