@@ -1327,22 +1327,26 @@ function _renderGcMessage(msg) {
     // ---- 头像 ----
     let avatarHtml = '';
     const avatarSize = settings?.inChatAvatarSize || 36;
+    const accentColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--accent-color').trim() || '#c5a47e';
+
     if (!isMine && msg.sender && msg.sender.startsWith('gc_')) {
         const memberId = msg.sender.replace('gc_', '');
         const member = (window.groupChatSettings?.members || []).find(m => String(m.id) === String(memberId));
+
         if (member && member.avatar) {
             avatarHtml = `<img src="${member.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         } else {
-            avatarHtml = `<i class="fas fa-user" style="font-size:${avatarSize * 0.4}px;color:var(--text-secondary);"></i>`;
+            const initial = (member && member.name) ? member.name.charAt(0).toUpperCase() : '?';
+            avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${initial}</div>`;
         }
     } else {
-        const avatarEl = isMine
-            ? document.querySelector('#my-avatar img')
-            : document.querySelector('#partner-avatar img');
+        const avatarEl = document.querySelector('#my-avatar img');
         if (avatarEl) {
             avatarHtml = avatarEl.outerHTML;
         } else {
-            avatarHtml = `<i class="fas fa-user" style="font-size:${avatarSize * 0.4}px;color:var(--text-secondary);"></i>`;
+            const myInitial = (typeof settings !== 'undefined' && settings.myName) ? settings.myName.charAt(0).toUpperCase() : '我';
+            avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${myInitial}</div>`;
         }
     }
 
@@ -1366,7 +1370,6 @@ function _renderGcMessage(msg) {
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content-wrapper';
 
-    // 群聊显示发送者名称
     if (!isMine && msg.memberName) {
         const nameLabel = document.createElement('div');
         nameLabel.className = 'group-sender-name';
@@ -1374,7 +1377,6 @@ function _renderGcMessage(msg) {
         contentWrapper.appendChild(nameLabel);
     }
 
-    // 消息气泡
     const bubble = document.createElement('div');
     bubble.className = `message message-${isMine ? 'sent' : 'received'} ${settings?.bubbleStyle || 'standard'}`;
     let content = msg.text || '';
@@ -1383,7 +1385,6 @@ function _renderGcMessage(msg) {
     bubble.innerHTML = content;
     contentWrapper.appendChild(bubble);
 
-    // 时间戳
     const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
         hour: '2-digit', minute: '2-digit'
     }) : '';
@@ -1395,7 +1396,6 @@ function _renderGcMessage(msg) {
     wrapper.appendChild(contentWrapper);
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
-    console.log('[renderGcMessage] 消息已渲染到 chat-container');
 }
 
 function scrollGcToBottom() {
