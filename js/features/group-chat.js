@@ -537,4 +537,6 @@ window.scrollToMessage = function(msgId) {
         el.style.background = 'rgba(var(--accent-color-rgb,180,140,100),0.18)';
         setTimeout(function() { el.style.background = ''; }, 1500);
     }
+    
+window.loadGcHistory = loadGcHistory;
 };
