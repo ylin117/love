@@ -1308,7 +1308,7 @@ function sendReply(question, result, isGroupMode) {
 }
 
 // =============================================
-// 辅助：直接渲染群聊消息到 #gcBox（与原生一致）
+// 辅助：直接渲染群聊消息到 #chat-container
 // =============================================
 function _renderGcMessage(msg) {
     const container = document.getElementById('chat-container');
@@ -1396,14 +1396,6 @@ function _renderGcMessage(msg) {
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
     console.log('[renderGcMessage] 消息已渲染到 chat-container');
-}
-
-// 确保 scrollGcToBottom 可用（若未定义则提供简单实现）
-if (typeof scrollGcToBottom !== 'function') {
-    window.scrollGcToBottom = function() {
-        const box = document.getElementById('gcBox');
-        if (box) box.scrollTop = box.scrollHeight;
-    };
 }
 
 function scrollGcToBottom() {
