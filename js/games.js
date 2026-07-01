@@ -1194,8 +1194,9 @@ function startDecisionProcess(question) {
 
     _storeMessage(storeName, userMsg).then(() => {
         if (isGroupMode) {
-            if (typeof loadGcHistory === 'function') {
-                loadGcHistory();
+            if (typeof appendGcMessageToUI === 'function') {
+                appendGcMessageToUI(userMsg);
+                if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
             }
         } else {
             if (typeof addMessage === 'function') {
@@ -1260,8 +1261,9 @@ function sendReply(question, result, isGroupMode) {
                 };
 
                 _storeMessage('gcMessages', replyMsg).then(() => {
-                    if (typeof loadGcHistory === 'function') {
-                        loadGcHistory();
+                    if (typeof appendGcMessageToUI === 'function') {
+                        appendGcMessageToUI(replyMsg);
+                        if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
                     }
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
