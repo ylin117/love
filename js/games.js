@@ -1311,54 +1311,91 @@ function sendReply(question, result, isGroupMode) {
 // 辅助：直接渲染群聊消息到 #gcBox（与原生一致）
 // =============================================
 function _renderGcMessage(msg) {
-    const box = document.getElementById('gcBox');
-    if (!box) {
-        console.warn('[renderGcMessage] gcBox 不存在');
+    const container = document.getElementById('chat-container');
+    if (!container) {
+        console.warn('[renderGcMessage] chat-container 不存在');
         return;
     }
-    if (box.style.display === 'none') {
-        box.style.display = '';
-    }
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.style.display = 'none';
 
     const isMine = msg.sender === 'me';
     const name = isMine
         ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
         : (msg.memberName || '群成员');
 
-    // 头像样式（与原生一致）
-    let avatarStyle = '';
+    // ---- 头像 ----
+    let avatarHtml = '';
+    const avatarSize = settings?.inChatAvatarSize || 36;
     if (!isMine && msg.sender && msg.sender.startsWith('gc_')) {
         const memberId = msg.sender.replace('gc_', '');
         const member = (window.groupChatSettings?.members || []).find(m => String(m.id) === String(memberId));
         if (member && member.avatar) {
-            avatarStyle = `background-image:url(${member.avatar});background-size:cover;background-position:center;`;
+            avatarHtml = `<img src="${member.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         } else {
-            avatarStyle = 'background:#e0d4f7;';
+            avatarHtml = `<i class="fas fa-user" style="font-size:${avatarSize * 0.4}px;color:var(--text-secondary);"></i>`;
+        }
+    } else {
+        const avatarEl = isMine
+            ? document.querySelector('#my-avatar img')
+            : document.querySelector('#partner-avatar img');
+        if (avatarEl) {
+            avatarHtml = avatarEl.outerHTML;
+        } else {
+            avatarHtml = `<i class="fas fa-user" style="font-size:${avatarSize * 0.4}px;color:var(--text-secondary);"></i>`;
         }
     }
 
-    let content = msg.text || '';
-    if (msg.type === 'image') content = `<img src="${msg.content}" class="msg-image" loading="lazy">`;
-    else if (msg.type === 'sticker') content = `<img src="${msg.content}" class="msg-sticker" loading="lazy">`;
+    const avatarShape = isMine
+        ? (settings?.myAvatarShape || 'circle')
+        : (settings?.partnerAvatarShape || 'circle');
 
+    // ---- 构建 DOM ----
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper ${isMine ? 'sent' : 'received'}`;
+    wrapper.dataset.id = msg.id;
+
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = `message-avatar shape-${avatarShape}`;
+    avatarDiv.style.width = avatarSize + 'px';
+    avatarDiv.style.height = avatarSize + 'px';
+    avatarDiv.style.flexShrink = '0';
+    avatarDiv.innerHTML = avatarHtml;
+    wrapper.appendChild(avatarDiv);
+
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'message-content-wrapper';
+
+    // 群聊显示发送者名称
+    if (!isMine && msg.memberName) {
+        const nameLabel = document.createElement('div');
+        nameLabel.className = 'group-sender-name';
+        nameLabel.textContent = msg.memberName;
+        contentWrapper.appendChild(nameLabel);
+    }
+
+    // 消息气泡
+    const bubble = document.createElement('div');
+    bubble.className = `message message-${isMine ? 'sent' : 'received'} ${settings?.bubbleStyle || 'standard'}`;
+    let content = msg.text || '';
+    if (msg.type === 'image') content = `<img src="${msg.content}" class="message-image" style="max-width:200px;border-radius:12px;">`;
+    else if (msg.type === 'sticker') content = `<img src="${msg.content}" style="max-width:150px;border-radius:8px;">`;
+    bubble.innerHTML = content;
+    contentWrapper.appendChild(bubble);
+
+    // 时间戳
     const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
         hour: '2-digit', minute: '2-digit'
     }) : '';
+    const meta = document.createElement('div');
+    meta.className = 'message-meta';
+    meta.innerHTML = `<div class="timestamp">${timeStr}</div>`;
+    contentWrapper.appendChild(meta);
 
-    const html = `
-        <div class="message ${isMine ? 'mine' : 'other'}" data-id="${msg.id}">
-            <div class="gc-msg-avatar ${isMine ? 'gc-avatar-me' : ''}" style="${isMine ? '' : avatarStyle}"></div>
-            <div class="bubble-wrap">
-                ${isMine ? '' : `<div class="gc-msg-name">${name}</div>`}
-                <div class="bubble">${content}</div>
-                <div class="msg-meta"><span class="time">${timeStr}</span></div>
-            </div>
-        </div>
-    `;
-
-    box.insertAdjacentHTML('beforeend', html);
-    box.scrollTop = box.scrollHeight;
-    console.log('[renderGcMessage] 消息已渲染到 gcBox');
+    wrapper.appendChild(contentWrapper);
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+    console.log('[renderGcMessage] 消息已渲染到 chat-container');
 }
 
 // 确保 scrollGcToBottom 可用（若未定义则提供简单实现）
@@ -1367,6 +1404,11 @@ if (typeof scrollGcToBottom !== 'function') {
         const box = document.getElementById('gcBox');
         if (box) box.scrollTop = box.scrollHeight;
     };
+}
+
+function scrollGcToBottom() {
+    const container = document.getElementById('chat-container');
+    if (container) container.scrollTop = container.scrollHeight;
 }
 
 function doPick() {
