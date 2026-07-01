@@ -1157,6 +1157,97 @@ function handleLetHimDecide() {
     if (spinBtn) spinBtn.disabled = false;
 }
 
+// ===== 独立群聊渲染（不依赖外部函数） =====
+function renderGroupMessage(msg) {
+    var container = document.getElementById('chat-container');
+    if (!container) return;
+
+    var isMine = msg.sender === 'user' || msg.sender === 'me';
+    var avatarSize = (typeof settings !== 'undefined' && settings.inChatAvatarSize) || 36;
+    var accentColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--accent-color').trim() || '#c5a47e';
+
+    // 构建头像 HTML
+    var avatarHtml = '';
+    if (!isMine && msg.sender && msg.sender.startsWith('gc_')) {
+        var memberId = msg.sender.replace('gc_', '');
+        var members = window.groupChatSettings ? window.groupChatSettings.members || [] : [];
+        var member = null;
+        for (var i = 0; i < members.length; i++) {
+            if (String(members[i].id) === String(memberId)) {
+                member = members[i];
+                break;
+            }
+        }
+        if (member && member.avatar) {
+            avatarHtml = '<img src="' + member.avatar + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+        } else {
+            var initial = (member && member.name) ? member.name.charAt(0).toUpperCase() : '?';
+            avatarHtml = '<div style="width:100%;height:100%;border-radius:50%;background:' + accentColor + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:' + (avatarSize * 0.4) + 'px;">' + initial + '</div>';
+        }
+    } else {
+        var avatarEl = document.querySelector('#my-avatar img');
+        if (avatarEl) {
+            avatarHtml = avatarEl.outerHTML;
+        } else {
+            var myName = (typeof settings !== 'undefined' && settings.myName) ? settings.myName : '我';
+            avatarHtml = '<div style="width:100%;height:100%;border-radius:50%;background:' + accentColor + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:' + (avatarSize * 0.4) + 'px;">' + myName.charAt(0).toUpperCase() + '</div>';
+        }
+    }
+
+    var avatarShape = isMine
+        ? (settings && settings.myAvatarShape ? settings.myAvatarShape : 'circle')
+        : (settings && settings.partnerAvatarShape ? settings.partnerAvatarShape : 'circle');
+
+    // 构建消息 DOM
+    var wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper ' + (isMine ? 'sent' : 'received');
+    wrapper.dataset.id = msg.id;
+
+    var avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar shape-' + avatarShape;
+    avatarDiv.style.width = avatarSize + 'px';
+    avatarDiv.style.height = avatarSize + 'px';
+    avatarDiv.style.flexShrink = '0';
+    avatarDiv.innerHTML = avatarHtml;
+    wrapper.appendChild(avatarDiv);
+
+    var contentWrapper = document.createElement('div');
+    contentWrapper.className = 'message-content-wrapper';
+
+    if (!isMine && msg.memberName) {
+        var nameLabel = document.createElement('div');
+        nameLabel.className = 'group-sender-name';
+        nameLabel.textContent = msg.memberName;
+        contentWrapper.appendChild(nameLabel);
+    }
+
+    var bubble = document.createElement('div');
+    var bubbleStyle = (settings && settings.bubbleStyle) ? settings.bubbleStyle : 'standard';
+    bubble.className = 'message message-' + (isMine ? 'sent' : 'received') + ' ' + bubbleStyle;
+    bubble.textContent = msg.text || '';
+    contentWrapper.appendChild(bubble);
+
+    var timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit'
+    }) : '';
+    var meta = document.createElement('div');
+    meta.className = 'message-meta';
+    meta.innerHTML = '<div class="timestamp">' + timeStr + '</div>';
+    contentWrapper.appendChild(meta);
+
+    wrapper.appendChild(contentWrapper);
+    container.appendChild(wrapper);
+
+    // 滚动到底部
+    container.scrollTop = container.scrollHeight;
+
+    // 隐藏空状态
+    var emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+}
+
 // =============================================
 // 2. 启动决策流程（发送用户消息 + 定时抽签）
 // =============================================
@@ -1194,11 +1285,8 @@ function startDecisionProcess(question) {
 
     _storeMessage(storeName, userMsg).then(() => {
         if (isGroupMode) {
-            if (typeof loadGcHistory === 'function') {
-                setTimeout(function() {
-                    loadGcHistory();
-                }, 300);
-            }
+            renderGroupMessage(userMsg);
+            if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
         } else {
             if (typeof addMessage === 'function') {
                 addMessage(userMsg);
@@ -1262,11 +1350,8 @@ function sendReply(question, result, isGroupMode) {
                 };
 
                 _storeMessage('gcMessages', replyMsg).then(() => {
-                    if (typeof loadGcHistory === 'function') {
-                        setTimeout(function() {
-                            loadGcHistory();
-                        }, 300);
-                    }
+                    renderGroupMessage(replyMsg);
+                    if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
@@ -1275,7 +1360,6 @@ function sendReply(question, result, isGroupMode) {
             }, offset);
         });
     } else {
-        // 单聊保持不变
         const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
         const replyMsg = {
             id: Date.now() + Math.random(),
