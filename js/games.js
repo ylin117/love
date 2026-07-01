@@ -1182,7 +1182,7 @@ function startDecisionProcess(question) {
         storeName = 'chatMessages';
         userMsg = {
             id: Date.now() + Math.random(),
-            sender: 'user',
+            sender: 'user',   // ✅ 与单聊一致
             type: 'normal',
             text: `让他决定：${question}`,
             timestamp: new Date(),
@@ -2051,27 +2051,4 @@ function initComboMenu() {
 
         renderView(cur);
     };
-// ===== 修复：切换昼夜模式后，群聊抽签消息消失 =====
-(function() {
-    if (typeof MutationObserver === 'function') {
-        const observer = new MutationObserver(function() {
-            // 仅在群聊模式开启时执行
-            if (window.groupChatSettings && window.groupChatSettings.enabled === true) {
-                // 等待切换动画完成，延迟重载群聊历史
-                setTimeout(function() {
-                    if (typeof loadGcHistory === 'function') {
-                        loadGcHistory();
-                        console.log('[修复] 切换主题后已重载群聊历史');
-                    } else {
-                        console.warn('[修复] loadGcHistory 未定义，无法重载群聊');
-                    }
-                }, 300);
-            }
-        });
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-        console.log('[修复] 已添加主题切换监听，用于重载群聊消息');
-    } else {
-        console.warn('[修复] 浏览器不支持 MutationObserver');
-    }
-})();
 })();
