@@ -1157,8 +1157,8 @@ function _updateReadReceiptsDOM() {
 }
 
 function renderMessages(preserveScroll = false) {
+    // 群聊保护
     if (window.groupChatSettings && window.groupChatSettings.enabled === true) {
-        console.log('[renderMessages] 群聊模式，跳过重新渲染');
         return;
     }
     const container = DOMElements.chatContainer;
