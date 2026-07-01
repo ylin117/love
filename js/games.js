@@ -1307,9 +1307,6 @@ function sendReply(question, result, isGroupMode) {
     }
 }
 
-// =============================================
-// 辅助：直接渲染群聊消息到 #chat-container
-// =============================================
 function _renderGcMessage(msg) {
     const container = document.getElementById('chat-container');
     if (!container) {
@@ -1319,12 +1316,14 @@ function _renderGcMessage(msg) {
     const emptyState = document.getElementById('empty-state');
     if (emptyState) emptyState.style.display = 'none';
 
-    const isMine = msg.sender === 'me';
+    // ===== 修复：正确识别自己的消息 =====
+    const isMine = msg.sender === 'user' || msg.sender === 'me';
+
     const name = isMine
         ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
         : (msg.memberName || '群成员');
 
-    // ---- 头像 ----
+    // ---- 头像（自己的头像从页面获取，对方头像从成员获取或彩色默认） ----
     let avatarHtml = '';
     const avatarSize = settings?.inChatAvatarSize || 36;
     const accentColor = getComputedStyle(document.documentElement)
@@ -1333,7 +1332,6 @@ function _renderGcMessage(msg) {
     if (!isMine && msg.sender && msg.sender.startsWith('gc_')) {
         const memberId = msg.sender.replace('gc_', '');
         const member = (window.groupChatSettings?.members || []).find(m => String(m.id) === String(memberId));
-
         if (member && member.avatar) {
             avatarHtml = `<img src="${member.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         } else {
@@ -1341,12 +1339,17 @@ function _renderGcMessage(msg) {
             avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${initial}</div>`;
         }
     } else {
-        const avatarEl = document.querySelector('#my-avatar img');
+        // 自己的头像：从页面获取
+        const avatarEl = isMine
+            ? document.querySelector('#my-avatar img')
+            : document.querySelector('#partner-avatar img');
         if (avatarEl) {
             avatarHtml = avatarEl.outerHTML;
         } else {
-            const myInitial = (typeof settings !== 'undefined' && settings.myName) ? settings.myName.charAt(0).toUpperCase() : '我';
-            avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${myInitial}</div>`;
+            const initial = isMine
+                ? (typeof settings !== 'undefined' && settings.myName ? settings.myName.charAt(0).toUpperCase() : '我')
+                : '?';
+            avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${initial}</div>`;
         }
     }
 
@@ -1396,15 +1399,18 @@ function _renderGcMessage(msg) {
     wrapper.appendChild(contentWrapper);
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
-    // ===== 同步到全局 messages 数组，确保切换主题后不消失 =====
+
+    // ===== 同步到 messages 数组（强制 sender 为 'user'） =====
     if (typeof messages !== 'undefined' && Array.isArray(messages)) {
         const exists = messages.some(m => m.id === msg.id);
         if (!exists) {
-            messages.push(msg);
+            // 复制消息，强制 sender 为 'user'
+            const storeMsg = { ...msg, sender: 'user' };
+            messages.push(storeMsg);
             if (typeof throttledSaveData === 'function') {
                 throttledSaveData();
             }
-            console.log('[renderGcMessage] 消息已同步到 messages 数组，当前消息数：', messages.length);
+            console.log('[renderGcMessage] 消息已同步到 messages 数组，sender 强制为 user');
         }
     }
 }
