@@ -1280,6 +1280,8 @@ function sendReply(question, result, isGroupMode) {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
                     }
                 });
+            }, offset);
+        });
     } else {
         // --- 单聊：直接回复 ---
         const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
