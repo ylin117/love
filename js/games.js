@@ -1169,29 +1169,45 @@ function handleLetHimDecide() {
 // 2. 启动决策流程（发送用户消息 + 定时抽签）
 // =============================================
 function startDecisionProcess(question) {
-    // 判断模式
     const isGroupMode = window.groupChatSettings && window.groupChatSettings.enabled === true;
 
-    // --- 2.1 发送用户消息（立即） ---
+    // --- 发送用户消息（立即） ---
     let storeName, userMsg;
     if (isGroupMode) {
-        if (typeof appendGcMessageToUI === 'function') {
-            appendGcMessageToUI(userMsg);
-            if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
-        }
+        storeName = 'gcMessages';
+        userMsg = {
+            id: Date.now() + Math.random(),
+            sender: 'me',
+            type: 'normal',
+            text: `让他决定：${question}`,
+            timestamp: new Date(),
+            status: 'sent',
+            favorited: false,
+            note: null,
+            replyTo: null
+        };
     } else {
-        if (typeof addMessage === 'function') {
-            addMessage(userMsg);
-        } else if (typeof appendMessageToUI === 'function') {
-            appendMessageToUI(userMsg, '已送达');
-        }
+        storeName = 'chatMessages';
+        userMsg = {
+            id: Date.now() + Math.random(),
+            sender: 'user',
+            type: 'normal',
+            text: `让他决定：${question}`,
+            timestamp: new Date(),
+            status: 'sent',
+            favorited: false,
+            note: null,
+            replyTo: null
+        };
     }
 
     // 存储并渲染用户消息
     _storeMessage(storeName, userMsg).then(() => {
         if (isGroupMode) {
-            _renderGroupMessage(userMsg, true);
-            if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+            if (typeof appendGcMessageToUI === 'function') {
+                appendGcMessageToUI(userMsg);
+                if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+            }
         } else {
             if (typeof addMessage === 'function') {
                 addMessage(userMsg);
@@ -1201,40 +1217,30 @@ function startDecisionProcess(question) {
         }
     });
 
-    // --- 2.2 模拟已读回执（与原生 sendMessage 一致） ---
-    const msgId = userMsg.id;
-    setTimeout(() => {
-        // 尝试从 messages 或 gcMessages 中查找并更新状态
-        if (isGroupMode) {
-            // 群聊没有已读机制，但我们可以模拟（仅更新界面，不实际存储）
-            // 简单起见，仅打印日志，不处理
-        } else {
-            const msg = messages.find(m => m.id === msgId);
+    // 模拟已读回执（仅单聊）
+    if (!isGroupMode) {
+        const msgId = userMsg.id;
+        setTimeout(() => {
+            const msg = window.messages ? window.messages.find(m => m.id === msgId) : null;
             if (msg) {
                 msg.status = 'read';
                 if (typeof _updateReadReceiptsDOM === 'function') _updateReadReceiptsDOM();
                 if (typeof throttledSaveData === 'function') throttledSaveData();
             }
-        }
-    }, 1500 + Math.random() * 2500);
+        }, 1500 + Math.random() * 2500);
+    }
 
-    // --- 2.3 设置延迟定时器（10~60秒后执行抽签并回复） ---
-    const delay = 10000 + Math.random() * 50000; // 10~60秒
+    // 延迟 10~60 秒后抽签并回复
+    const delay = 10000 + Math.random() * 50000;
     console.log(`[让他决定] 将在 ${Math.round(delay/1000)} 秒后抽签并回复`);
 
     setTimeout(() => {
-        // 从选项列表中均匀随机抽取一个结果
         const result = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
         console.log(`[让他决定] 抽签结果：${result}`);
-
-        // 立即发送回复（单聊/群聊）
         sendReply(question, result, isGroupMode);
     }, delay);
 }
 
-// =============================================
-// 3. 发送回复（无延迟，立即执行）
-// =============================================
 function sendReply(question, result, isGroupMode) {
     if (isGroupMode) {
         // --- 群聊：随机选择 1~3 位成员，各自独立抽签回复 ---
@@ -1251,9 +1257,7 @@ function sendReply(question, result, isGroupMode) {
         const selectedMembers = shuffled.slice(0, replyCount);
 
         selectedMembers.forEach((member, index) => {
-            // 每位成员独立抽签
             const memberResult = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
-            // 成员间错开 0~2 秒，避免同时刷屏
             const offset = index * 500 + Math.random() * 1500;
 
             setTimeout(() => {
