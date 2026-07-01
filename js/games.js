@@ -1195,11 +1195,7 @@ function startDecisionProcess(question) {
     _storeMessage(storeName, userMsg).then(() => {
         if (isGroupMode) {
             if (typeof loadGcHistory === 'function') {
-                loadGcHistory(); // 完全复用原生群聊渲染
-            } else {
-                // 极少数情况下的降级（理论上不会执行）
-                _renderGcMessage(userMsg);
-                scrollGcToBottom();
+                loadGcHistory();
             }
         } else {
             if (typeof addMessage === 'function') {
@@ -1265,10 +1261,7 @@ function sendReply(question, result, isGroupMode) {
 
                 _storeMessage('gcMessages', replyMsg).then(() => {
                     if (typeof loadGcHistory === 'function') {
-                        loadGcHistory(); // 完全复用原生群聊渲染
-                    } else {
-                        _renderGcMessage(replyMsg);
-                        scrollGcToBottom();
+                        loadGcHistory();
                     }
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
