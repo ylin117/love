@@ -1396,17 +1396,15 @@ function _renderGcMessage(msg) {
     wrapper.appendChild(contentWrapper);
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
-
-    // ===== 同步到 messages 数组，确保切换主题后不消失 =====
-    if (window.messages && Array.isArray(window.messages)) {
-        // 检查是否已存在相同 id 的消息（避免重复）
-        const exists = window.messages.some(m => m.id === msg.id);
+    // ===== 同步到全局 messages 数组，确保切换主题后不消失 =====
+    if (typeof messages !== 'undefined' && Array.isArray(messages)) {
+        const exists = messages.some(m => m.id === msg.id);
         if (!exists) {
-            window.messages.push(msg);
+            messages.push(msg);
             if (typeof throttledSaveData === 'function') {
                 throttledSaveData();
             }
-            console.log('[renderGcMessage] 消息已同步到 messages 数组');
+            console.log('[renderGcMessage] 消息已同步到 messages 数组，当前消息数：', messages.length);
         }
     }
 }
