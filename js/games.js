@@ -1175,31 +1175,16 @@ function startDecisionProcess(question) {
     // --- 2.1 发送用户消息（立即） ---
     let storeName, userMsg;
     if (isGroupMode) {
-        storeName = 'gcMessages';
-        userMsg = {
-            id: Date.now() + Math.random(),
-            sender: 'me',
-            type: 'normal',
-            text: `让他决定：${question}`,
-            timestamp: new Date(),
-            status: 'sent',
-            favorited: false,
-            note: null,
-            replyTo: null
-        };
+        if (typeof appendGcMessageToUI === 'function') {
+            appendGcMessageToUI(userMsg);
+            if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+        }
     } else {
-        storeName = 'chatMessages';
-        userMsg = {
-            id: Date.now() + Math.random(),
-            sender: 'user',
-            type: 'normal',
-            text: `让他决定：${question}`,
-            timestamp: new Date(),
-            status: 'sent',
-            favorited: false,
-            note: null,
-            replyTo: null
-        };
+        if (typeof addMessage === 'function') {
+            addMessage(userMsg);
+        } else if (typeof appendMessageToUI === 'function') {
+            appendMessageToUI(userMsg, '已送达');
+        }
     }
 
     // 存储并渲染用户消息
@@ -1286,14 +1271,15 @@ function sendReply(question, result, isGroupMode) {
                 };
 
                 _storeMessage('gcMessages', replyMsg).then(() => {
-                    _renderGroupMessage(replyMsg, false);
+                    if (typeof appendGcMessageToUI === 'function') {
+                        appendGcMessageToUI(replyMsg);
+                        if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
+                    }
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
                     }
                 });
-            }, offset);
-        });
     } else {
         // --- 单聊：直接回复 ---
         const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
@@ -1324,83 +1310,6 @@ function sendReply(question, result, isGroupMode) {
             playSound('message');
         }
     }
-}
-
-// =============================================
-// 辅助：渲染群聊消息（与之前相同，但已包含在 sendLetHimDecide 中，现在单独提出来）
-// =============================================
-function _renderGroupMessage(msg, isMine) {
-    const container = document.getElementById('chat-container');
-    if (!container) {
-        console.warn('[renderGroupMessage] chat-container 不存在');
-        return false;
-    }
-
-    const emptyState = document.getElementById('empty-state');
-    if (emptyState) emptyState.style.display = 'none';
-
-    const isUser = isMine || msg.sender === 'me';
-    const senderName = isUser
-        ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
-        : (msg.memberName || '群成员');
-
-    let avatarHtml = '';
-    if (!isUser && msg.sender && msg.sender.startsWith('gc_')) {
-        const memberId = msg.sender.replace('gc_', '');
-        const member = (window.groupChatSettings?.members || []).find(m => String(m.id) === String(memberId));
-        if (member && member.avatar) {
-            avatarHtml = `<img src="${member.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-        } else {
-            avatarHtml = `<i class="fas fa-user" style="font-size:14px;color:var(--text-secondary);"></i>`;
-        }
-    } else {
-        avatarHtml = isUser
-            ? (document.querySelector('#my-avatar img') ? document.querySelector('#my-avatar img').outerHTML : '<i class="fas fa-user" style="font-size:14px;color:var(--text-secondary);"></i>')
-            : (document.querySelector('#partner-avatar img') ? document.querySelector('#partner-avatar img').outerHTML : '<i class="fas fa-user" style="font-size:14px;color:var(--text-secondary);"></i>');
-    }
-
-    let content = msg.text || '';
-    if (msg.type === 'image') content = `<img src="${msg.content}" class="message-image" style="max-width:200px;border-radius:12px;">`;
-    else if (msg.type === 'sticker') content = `<img src="${msg.content}" style="max-width:150px;border-radius:8px;">`;
-
-    const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
-        hour: '2-digit', minute: '2-digit'
-    }) : '';
-
-    const wrapper = document.createElement('div');
-    wrapper.className = `message-wrapper ${isUser ? 'sent' : 'received'}`;
-    wrapper.dataset.id = msg.id;
-
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'message-avatar';
-    avatarDiv.innerHTML = avatarHtml;
-    wrapper.appendChild(avatarDiv);
-
-    const contentWrapper = document.createElement('div');
-    contentWrapper.className = 'message-content-wrapper';
-
-    if (!isUser && msg.memberName) {
-        const nameLabel = document.createElement('div');
-        nameLabel.className = 'group-sender-name';
-        nameLabel.textContent = msg.memberName;
-        contentWrapper.appendChild(nameLabel);
-    }
-
-    const bubble = document.createElement('div');
-    bubble.className = `message message-${isUser ? 'sent' : 'received'} ${settings?.bubbleStyle || 'standard'}`;
-    bubble.innerHTML = content;
-    contentWrapper.appendChild(bubble);
-
-    const meta = document.createElement('div');
-    meta.className = 'message-meta';
-    meta.innerHTML = `<div class="timestamp">${timeStr}</div>`;
-    contentWrapper.appendChild(meta);
-
-    wrapper.appendChild(contentWrapper);
-    container.appendChild(wrapper);
-
-    container.scrollTop = container.scrollHeight;
-    return true;
 }
 
 function doPick() {
