@@ -1169,7 +1169,7 @@ function startDecisionProcess(question) {
         storeName = 'gcMessages';
         userMsg = {
             id: Date.now() + Math.random(),
-            sender: 'me',
+            sender: 'user',   // 统一为 'user'，让 _renderGcMessage 识别为自己
             type: 'normal',
             text: `让他决定：${question}`,
             timestamp: new Date(),
@@ -1182,7 +1182,7 @@ function startDecisionProcess(question) {
         storeName = 'chatMessages';
         userMsg = {
             id: Date.now() + Math.random(),
-            sender: 'user',   // ✅ 与单聊一致
+            sender: 'user',
             type: 'normal',
             text: `让他决定：${question}`,
             timestamp: new Date(),
@@ -1230,9 +1230,6 @@ function startDecisionProcess(question) {
     }, delay);
 }
 
-// =============================================
-// 3. 发送回复（无延迟，立即执行）
-// =============================================
 function sendReply(question, result, isGroupMode) {
     if (isGroupMode) {
         const members = window.groupChatSettings?.members || [];
@@ -1316,14 +1313,10 @@ function _renderGcMessage(msg) {
     const emptyState = document.getElementById('empty-state');
     if (emptyState) emptyState.style.display = 'none';
 
-    // ===== 修复：正确识别自己的消息 =====
+    // 判断是否为自己的消息
     const isMine = msg.sender === 'user' || msg.sender === 'me';
 
-    const name = isMine
-        ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
-        : (msg.memberName || '群成员');
-
-    // ---- 头像（自己的头像从页面获取，对方头像从成员获取或彩色默认） ----
+    // 头像
     let avatarHtml = '';
     const avatarSize = settings?.inChatAvatarSize || 36;
     const accentColor = getComputedStyle(document.documentElement)
@@ -1339,17 +1332,13 @@ function _renderGcMessage(msg) {
             avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${initial}</div>`;
         }
     } else {
-        // 自己的头像：从页面获取
-        const avatarEl = isMine
-            ? document.querySelector('#my-avatar img')
-            : document.querySelector('#partner-avatar img');
+        // 自己的头像：从页面元素获取
+        const avatarEl = document.querySelector('#my-avatar img');
         if (avatarEl) {
             avatarHtml = avatarEl.outerHTML;
         } else {
-            const initial = isMine
-                ? (typeof settings !== 'undefined' && settings.myName ? settings.myName.charAt(0).toUpperCase() : '我')
-                : '?';
-            avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${initial}</div>`;
+            const myName = (typeof settings !== 'undefined' && settings.myName) ? settings.myName : '我';
+            avatarHtml = `<div style="width:100%;height:100%;border-radius:50%;background:${accentColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${avatarSize * 0.4}px;">${myName.charAt(0).toUpperCase()}</div>`;
         }
     }
 
@@ -1357,7 +1346,7 @@ function _renderGcMessage(msg) {
         ? (settings?.myAvatarShape || 'circle')
         : (settings?.partnerAvatarShape || 'circle');
 
-    // ---- 构建 DOM ----
+    // 构建消息 DOM
     const wrapper = document.createElement('div');
     wrapper.className = `message-wrapper ${isMine ? 'sent' : 'received'}`;
     wrapper.dataset.id = msg.id;
@@ -1382,10 +1371,7 @@ function _renderGcMessage(msg) {
 
     const bubble = document.createElement('div');
     bubble.className = `message message-${isMine ? 'sent' : 'received'} ${settings?.bubbleStyle || 'standard'}`;
-    let content = msg.text || '';
-    if (msg.type === 'image') content = `<img src="${msg.content}" class="message-image" style="max-width:200px;border-radius:12px;">`;
-    else if (msg.type === 'sticker') content = `<img src="${msg.content}" style="max-width:150px;border-radius:8px;">`;
-    bubble.innerHTML = content;
+    bubble.textContent = msg.text || '';
     contentWrapper.appendChild(bubble);
 
     const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
@@ -1399,20 +1385,6 @@ function _renderGcMessage(msg) {
     wrapper.appendChild(contentWrapper);
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
-
-    // ===== 同步到 messages 数组（强制 sender 为 'user'） =====
-    if (typeof messages !== 'undefined' && Array.isArray(messages)) {
-        const exists = messages.some(m => m.id === msg.id);
-        if (!exists) {
-            // 复制消息，强制 sender 为 'user'
-            const storeMsg = { ...msg, sender: 'user' };
-            messages.push(storeMsg);
-            if (typeof throttledSaveData === 'function') {
-                throttledSaveData();
-            }
-            console.log('[renderGcMessage] 消息已同步到 messages 数组，sender 强制为 user');
-        }
-    }
 }
 
 function scrollGcToBottom() {
