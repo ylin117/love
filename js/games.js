@@ -2051,5 +2051,31 @@ function initComboMenu() {
 
         renderView(cur);
     };
+    
+// ===== 修复：切换昼夜模式后自动重载群聊消息 =====
+(function() {
+    let isGroupMode = window.groupChatSettings && window.groupChatSettings.enabled === true;
+    // 监听 data-theme 变化
+    const observer = new MutationObserver(function() {
+        // 检查当前是否群聊模式
+        if (window.groupChatSettings && window.groupChatSettings.enabled === true) {
+            setTimeout(function() {
+                // 重新加载群聊历史（gcMessages 表）
+                if (typeof loadGcHistory === 'function') {
+                    loadGcHistory();
+                    console.log('[修复] 主题切换后已重新加载群聊历史');
+                } else {
+                    // 如果 loadGcHistory 未定义，尝试直接重新渲染 messages 中的群聊消息
+                    // 但这里更安全的是触发一次消息更新
+                    if (typeof renderMessages === 'function') {
+                        // 但 renderMessages 可能只渲染单聊，我们先尝试调用 renderMessages
+                        renderMessages();
+                        console.log('[修复] 主题切换后已重新渲染消息');
+                    }
+                }
+            }, 300);
+        }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 })();
