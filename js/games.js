@@ -1136,26 +1136,18 @@ function handleLetHimDecide() {
         showNotification('请先输入你想让对方决定的事情', 'warning');
         return;
     }
-
-    // 验证选项列表非空
     if (!wheelOptions || wheelOptions.length === 0) {
         showNotification('请先添加选项', 'warning');
         return;
     }
 
-    // 启动决策流程（发送用户消息 + 定时抽签 + 回复）
     startDecisionProcess(question);
 
-    // 关闭抽签弹窗
     const modal = document.getElementById('wheel-modal');
     if (modal && typeof hideModal === 'function') {
         hideModal(modal);
     }
-
-    // 清空输入框
     if (input) input.value = '';
-
-    // 清空结果状态
     wheelResultText = '';
     const resultEl = document.getElementById('wheel-result');
     if (resultEl) { resultEl.textContent = ''; resultEl.classList.remove('show'); }
@@ -1171,7 +1163,7 @@ function handleLetHimDecide() {
 function startDecisionProcess(question) {
     const isGroupMode = window.groupChatSettings && window.groupChatSettings.enabled === true;
 
-    // --- 发送用户消息（立即） ---
+    // --- 用户消息 ---
     let storeName, userMsg;
     if (isGroupMode) {
         storeName = 'gcMessages';
@@ -1201,13 +1193,11 @@ function startDecisionProcess(question) {
         };
     }
 
-    // 存储并渲染用户消息
+    // 存储并渲染
     _storeMessage(storeName, userMsg).then(() => {
         if (isGroupMode) {
-            if (typeof appendGcMessageToUI === 'function') {
-                appendGcMessageToUI(userMsg);
-                if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
-            }
+            _renderGcMessage(userMsg);
+            scrollGcToBottom();
         } else {
             if (typeof addMessage === 'function') {
                 addMessage(userMsg);
@@ -1217,7 +1207,7 @@ function startDecisionProcess(question) {
         }
     });
 
-    // 模拟已读回执（仅单聊）
+    // 已读回执（单聊）
     if (!isGroupMode) {
         const msgId = userMsg.id;
         setTimeout(() => {
@@ -1230,10 +1220,9 @@ function startDecisionProcess(question) {
         }, 1500 + Math.random() * 2500);
     }
 
-    // 延迟 10~60 秒后抽签并回复
+    // 延迟抽签
     const delay = 10000 + Math.random() * 50000;
     console.log(`[让他决定] 将在 ${Math.round(delay/1000)} 秒后抽签并回复`);
-
     setTimeout(() => {
         const result = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
         console.log(`[让他决定] 抽签结果：${result}`);
@@ -1241,9 +1230,11 @@ function startDecisionProcess(question) {
     }, delay);
 }
 
+// =============================================
+// 3. 发送回复（无延迟，立即执行）
+// =============================================
 function sendReply(question, result, isGroupMode) {
     if (isGroupMode) {
-        // --- 群聊：随机选择 1~3 位成员，各自独立抽签回复 ---
         const members = window.groupChatSettings?.members || [];
         if (members.length === 0) {
             if (typeof showNotification === 'function') {
@@ -1275,10 +1266,8 @@ function sendReply(question, result, isGroupMode) {
                 };
 
                 _storeMessage('gcMessages', replyMsg).then(() => {
-                    if (typeof appendGcMessageToUI === 'function') {
-                        appendGcMessageToUI(replyMsg);
-                        if (typeof scrollGcToBottom === 'function') scrollGcToBottom();
-                    }
+                    _renderGcMessage(replyMsg);
+                    scrollGcToBottom();
                     if (typeof playSound === 'function') playSound('message');
                     if (index === 0 && typeof showNotification === 'function') {
                         showNotification(`${selectedMembers.length} 位成员已回复 ✨`, 'success', 3000);
@@ -1287,7 +1276,7 @@ function sendReply(question, result, isGroupMode) {
             }, offset);
         });
     } else {
-        // --- 单聊：直接回复 ---
+        // 单聊
         const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
         const replyMsg = {
             id: Date.now() + Math.random(),
@@ -1316,6 +1305,68 @@ function sendReply(question, result, isGroupMode) {
             playSound('message');
         }
     }
+}
+
+// =============================================
+// 辅助：直接渲染群聊消息到 #gcBox（与原生一致）
+// =============================================
+function _renderGcMessage(msg) {
+    const box = document.getElementById('gcBox');
+    if (!box) {
+        console.warn('[renderGcMessage] gcBox 不存在');
+        return;
+    }
+    if (box.style.display === 'none') {
+        box.style.display = '';
+    }
+
+    const isMine = msg.sender === 'me';
+    const name = isMine
+        ? (typeof settings !== 'undefined' && settings.myName ? settings.myName : '我')
+        : (msg.memberName || '群成员');
+
+    // 头像样式（与原生一致）
+    let avatarStyle = '';
+    if (!isMine && msg.sender && msg.sender.startsWith('gc_')) {
+        const memberId = msg.sender.replace('gc_', '');
+        const member = (window.groupChatSettings?.members || []).find(m => String(m.id) === String(memberId));
+        if (member && member.avatar) {
+            avatarStyle = `background-image:url(${member.avatar});background-size:cover;background-position:center;`;
+        } else {
+            avatarStyle = 'background:#e0d4f7;';
+        }
+    }
+
+    let content = msg.text || '';
+    if (msg.type === 'image') content = `<img src="${msg.content}" class="msg-image" loading="lazy">`;
+    else if (msg.type === 'sticker') content = `<img src="${msg.content}" class="msg-sticker" loading="lazy">`;
+
+    const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
+        hour: '2-digit', minute: '2-digit'
+    }) : '';
+
+    const html = `
+        <div class="message ${isMine ? 'mine' : 'other'}" data-id="${msg.id}">
+            <div class="gc-msg-avatar ${isMine ? 'gc-avatar-me' : ''}" style="${isMine ? '' : avatarStyle}"></div>
+            <div class="bubble-wrap">
+                ${isMine ? '' : `<div class="gc-msg-name">${name}</div>`}
+                <div class="bubble">${content}</div>
+                <div class="msg-meta"><span class="time">${timeStr}</span></div>
+            </div>
+        </div>
+    `;
+
+    box.insertAdjacentHTML('beforeend', html);
+    box.scrollTop = box.scrollHeight;
+    console.log('[renderGcMessage] 消息已渲染到 gcBox');
+}
+
+// 确保 scrollGcToBottom 可用（若未定义则提供简单实现）
+if (typeof scrollGcToBottom !== 'function') {
+    window.scrollGcToBottom = function() {
+        const box = document.getElementById('gcBox');
+        if (box) box.scrollTop = box.scrollHeight;
+    };
 }
 
 function doPick() {
