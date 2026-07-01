@@ -1194,10 +1194,10 @@ function startDecisionProcess(question) {
 
     _storeMessage(storeName, userMsg).then(() => {
         if (isGroupMode) {
-            // 群聊：重新加载群聊历史（与正常群聊一致）
             if (typeof loadGcHistory === 'function') {
-                loadGcHistory();
+                loadGcHistory(); // 完全复用原生群聊渲染
             } else {
+                // 极少数情况下的降级（理论上不会执行）
                 _renderGcMessage(userMsg);
                 scrollGcToBottom();
             }
@@ -1210,7 +1210,6 @@ function startDecisionProcess(question) {
         }
     });
 
-    // 已读回执（单聊）
     if (!isGroupMode) {
         const msgId = userMsg.id;
         setTimeout(() => {
@@ -1265,9 +1264,8 @@ function sendReply(question, result, isGroupMode) {
                 };
 
                 _storeMessage('gcMessages', replyMsg).then(() => {
-                    // 群聊：重新加载群聊历史（与正常群聊一致）
                     if (typeof loadGcHistory === 'function') {
-                        loadGcHistory();
+                        loadGcHistory(); // 完全复用原生群聊渲染
                     } else {
                         _renderGcMessage(replyMsg);
                         scrollGcToBottom();
@@ -1280,7 +1278,7 @@ function sendReply(question, result, isGroupMode) {
             }, offset);
         });
     } else {
-        // 单聊（保持不变）
+        // 单聊保持不变
         const partnerName = (typeof settings !== 'undefined' && settings.partnerName) ? settings.partnerName : '对方';
         const replyMsg = {
             id: Date.now() + Math.random(),
