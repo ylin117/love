@@ -539,4 +539,5 @@ window.scrollToMessage = function(msgId) {
     }
     
 window.loadGcHistory = loadGcHistory;
+window.appendGcMessageToUI = appendGcMessageToUI;
 };
