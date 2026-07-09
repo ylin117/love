@@ -1665,6 +1665,38 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
 
             // 确认有可用回复后再展示“正在输入中”，避免空转
             showTypingIndicator();
+                    // ★★ 新增：检查是否触发反向提问（单聊） ★★
+                    const allCards = (typeof cachedFlashcards !== 'undefined' && cachedFlashcards.length) ? cachedFlashcards : customReplies;
+                    if (shouldTriggerReverseQuestion()) {
+                        const questionCards = allCards.filter(c => c.groupId === '询问类');
+                        let questionText = '';
+                        if (questionCards.length > 0) {
+                            const count = 1 + Math.floor(Math.random() * 5);
+                            const shuffled = [...questionCards].sort(() => Math.random() - 0.5);
+                            const picked = shuffled.slice(0, count);
+                            questionText = picked.map(c => c.replyText).join('');
+                        } else if (allCards.length > 0) {
+                            const shuffled = [...allCards].sort(() => Math.random() - 0.5);
+                            const count = 1 + Math.floor(Math.random() * 5);
+                            const picked = shuffled.slice(0, count);
+                            questionText = picked.map(c => c.replyText).join('');
+                        }
+                        if (questionText) {
+                            const qMsg = {
+                                sender: 'sean',
+                                type: 'text',
+                                text: questionText,
+                                timestamp: Date.now()
+                            };
+                            await add('messages', qMsg);
+                            if (_gcMode === 0 && document.getElementById('view-chat').classList.contains('active')) {
+                                appendMessageToUI(qMsg, '');
+                            }
+                            showReverseQuestionModal(questionText, seanName);
+                            return;
+                        }
+                    }
+            
             let delay = 0;
             const recentUserMsgs = settings.replyEnabled
                 ? messages.filter(m => m.sender === 'user' && m.text).slice(-10)
