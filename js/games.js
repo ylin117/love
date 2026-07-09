@@ -1028,7 +1028,163 @@ function initDecisionModule() {
         });
         sendResultBtn.dataset.initialized = 'true';
     }
+
+    // ★★ 新增：绑定“让他决定”按钮 ★★
+    const letHimBtn = document.getElementById('let-him-decide-btn');
+    if (letHimBtn && !letHimBtn.dataset.initialized) {
+        letHimBtn.addEventListener('click', handleLetHimDecide);
+        letHimBtn.dataset.initialized = 'true';
+    }
 }
+
+// ============================================================
+// ★★ 新增：“让他决定” + 反向提问 完整逻辑 ★★
+// ============================================================
+
+// ---- 反向提问 Buff 管理 ----
+const LET_HIM_DECIDE_BUFF_KEY = 'letHimDecideBuff';
+
+function activateReverseQuestionBuff() {
+    const expires = Date.now() + 3600000; // 1小时
+    localStorage.setItem(LET_HIM_DECIDE_BUFF_KEY, String(expires));
+}
+
+function isReverseQuestionBuffActive() {
+    const expires = localStorage.getItem(LET_HIM_DECIDE_BUFF_KEY);
+    if (!expires) return false;
+    return Date.now() < parseInt(expires);
+}
+
+function shouldTriggerReverseQuestion() {
+    if (!isReverseQuestionBuffActive()) return false;
+    return Math.random() < 0.03; // 3%概率
+}
+
+// ---- “让他决定” 主入口 ----
+window.handleLetHimDecide = async function() {
+    const questionInput = document.getElementById('decide-question-input');
+    const question = questionInput ? questionInput.value.trim() : '';
+    if (!question) {
+        showNotification('请先输入你的问题', 'warning');
+        return;
+    }
+    if (wheelOptions.length < 2) {
+        showNotification('请至少添加两个选项', 'warning');
+        return;
+    }
+
+    // 关闭抽签弹窗
+    hideModal(document.getElementById('wheel-modal'));
+
+    // 1. 发送用户消息到聊天
+    const userMsg = `让他决定：${question}`;
+    if (_gcMode === 0) {
+        sendMyMessage(userMsg, 'text');
+    } else {
+        sendGcMessage(userMsg, 'text');
+    }
+
+    // 2. 激活反向提问 Buff（1小时）
+    activateReverseQuestionBuff();
+
+    // 3. 延迟 10~20 秒后让对方回复
+    const delay = 10000 + Math.random() * 10000;
+    setTimeout(() => {
+        if (_gcMode === 0) {
+            simulateLetHimDecideReply(question);
+        } else {
+            simulateGroupLetHimDecideReply(question);
+        }
+    }, delay);
+};
+
+// ---- 单聊回复 ----
+async function simulateLetHimDecideReply(question) {
+    const picked = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
+    const replyText = `关于“${question}”，我的答案是：${picked}`;
+    const msg = {
+        sender: 'sean',
+        type: 'text',
+        text: replyText,
+        timestamp: Date.now()
+    };
+    msg.id = await add('messages', msg);
+    if (_gcMode === 0 && document.getElementById('view-chat').classList.contains('active')) {
+        appendMessageToUI(msg, '');
+        playSound('message');
+    } else {
+        showMsgBanner(seanName, replyText);
+        playNotifySound(seanName, replyText);
+    }
+}
+
+// ---- 群聊回复 ----
+async function simulateGroupLetHimDecideReply(question) {
+    const members = cachedGcMembers || [];
+    if (members.length === 0) return;
+    const count = 1 + Math.floor(Math.random() * 3);
+    const shuffled = [...members].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, count);
+    for (const mem of selected) {
+        const picked = wheelOptions[Math.floor(Math.random() * wheelOptions.length)];
+        const replyText = `关于“${question}”，我的答案是：${picked}`;
+        const msg = {
+            sender: 'gc_' + mem.id,
+            memberName: mem.name,
+            type: 'text',
+            text: replyText,
+            timestamp: Date.now()
+        };
+        msg.id = await add('gcMessages', msg);
+        if (_gcMode === 1 && document.getElementById('view-chat').classList.contains('active')) {
+            appendGcMessageToUI(msg);
+            playSound('message');
+        } else {
+            showMsgBanner(mem.name, replyText);
+            playNotifySound(mem.name, replyText);
+        }
+        await new Promise(r => setTimeout(r, 500 + Math.random() * 1000));
+    }
+}
+
+// ---- 反向提问弹窗（显示“是/否/半对”） ----
+window.showReverseQuestionModal = function(question, senderName) {
+    // 防止重复弹窗
+    if (document.getElementById('reverse-question-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'reverse-question-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:var(--secondary-bg);border-radius:20px;padding:24px;width:90%;max-width:400px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">${senderName} 想问你</div>
+            <div style="font-size:17px;font-weight:600;color:var(--text-primary);margin-bottom:20px;line-height:1.5;word-break:break-word;">${question}</div>
+            <div style="display:flex;gap:10px;">
+                <button class="modal-btn" data-answer="是" style="flex:1;background:#4CAF50;color:#fff;">是</button>
+                <button class="modal-btn" data-answer="半对" style="flex:1;background:#FF9800;color:#fff;">半对</button>
+                <button class="modal-btn" data-answer="否" style="flex:1;background:#f44336;color:#fff;">否</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('[data-answer]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const answer = btn.dataset.answer;
+            overlay.remove();
+            const replyText = `我回答：${answer}`;
+            // 发送回答到当前聊天频道
+            if (_gcMode === 0) {
+                sendMyMessage(replyText, 'text');
+            } else {
+                sendGcMessage(replyText, 'text');
+            }
+        });
+    });
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+};
 
 function initPicker() {
     renderPickerOptions();
