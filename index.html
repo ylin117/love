@@ -2068,12 +2068,21 @@
                     <div class="picker-cards-row" id="picker-cards-row"></div>
                     <div class="picker-result-text" id="wheel-result"></div>
                 </div>
-                <div class="picker-controls">
+               <div class="picker-controls">
                     <div class="picker-options-label">选项列表（至少 2 项）</div>
+                    <!-- ★ 新增：问题输入框 ★ -->
+                    <div style="display:flex; gap:8px; margin-bottom:10px;">
+                        <input type="text" id="decide-question-input" class="form-input" placeholder="输入你的问题" style="flex:1; font-size:14px;">
+                    </div>
                     <div class="picker-options-list" id="wheel-options-list"></div>
                     <button class="modal-btn modal-btn-secondary picker-add-btn" id="add-wheel-option">
                         <i class="fas fa-plus"></i> 添加选项
                     </button>
+                    <!-- ★ 修改：按钮行增加“让他决定” ★ -->
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button class="modal-btn modal-btn-primary" id="spin-wheel-btn" style="flex:1;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 12a10 10 0 0 1 18.8-3.6M22 12a10 10 0 0 1-18.8 3.6"/></svg> 开始抽签</button>
+                        <button class="modal-btn modal-btn-secondary" id="let-him-decide-btn" style="flex:1; background:var(--accent-color); color:#fff; border-color:var(--accent-color);"><i class="fas fa-comment"></i> 让他决定</button>
+                    </div>
                 </div>
             </div>
     
